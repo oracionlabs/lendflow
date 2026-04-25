@@ -1,0 +1,99 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 138 25% 96%;
+    --foreground: 220 20% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 220 20% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 20% 10%;
+    --primary: 142 52% 38%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 138 15% 92%;
+    --secondary-foreground: 220 15% 20%;
+    --muted: 138 12% 93%;
+    --muted-foreground: 220 10% 50%;
+    --accent: 138 20% 90%;
+    --accent-foreground: 142 52% 30%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 138 10% 87%;
+    --input: 138 10% 87%;
+    --ring: 142 52% 38%;
+    --radius: 0.75rem;
+  }
+
+  .dark {
+    --background: 220 15% 10%;
+    --foreground: 0 0% 98%;
+    --card: 220 15% 14%;
+    --card-foreground: 0 0% 98%;
+    --popover: 220 15% 14%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 142 52% 45%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 15% 18%;
+    --secondary-foreground: 0 0% 90%;
+    --muted: 220 12% 18%;
+    --muted-foreground: 220 8% 56%;
+    --accent: 220 12% 20%;
+    --accent-foreground: 142 52% 55%;
+    --destructive: 0 62% 50%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 220 12% 22%;
+    --input: 220 12% 22%;
+    --ring: 142 52% 45%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'DM Sans', system-ui, sans-serif;
+    font-feature-settings: "rlig" 1, "calt" 1;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+/* Card depth system — matches the design's layered elevation */
+.card-base {
+  @apply rounded-xl bg-white border border-border;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+}
+
+.card-elevated {
+  @apply rounded-xl bg-white border border-border;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.card-ring {
+  @apply rounded-xl bg-white;
+  box-shadow: 0 0 0 2px hsl(142 52% 38%), 0 4px 16px rgba(0,0,0,0.10);
+}
+
+/* Tab underline style from the design */
+.tab-underline {
+  @apply relative pb-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground;
+}
+.tab-underline.active {
+  @apply text-foreground;
+}
+.tab-underline.active::after {
+  content: '';
+  @apply absolute bottom-0 left-0 right-0 h-0.5 rounded-full bg-primary;
+}
+
+/* Avatar color palette */
+.avatar-green  { background: #dcfce7; color: #16a34a; }
+.avatar-blue   { background: #dbeafe; color: #2563eb; }
+.avatar-amber  { background: #fef3c7; color: #d97706; }
+.avatar-purple { background: #ede9fe; color: #7c3aed; }
+.avatar-red    { background: #fee2e2; color: #dc2626; }
+.avatar-teal   { background: #ccfbf1; color: #0d9488; }

@@ -1,0 +1,12 @@
+CREATE INDEX idx_loans_status ON loans(status);
+CREATE INDEX idx_loans_borrower ON loans(borrower_id);
+CREATE INDEX idx_loans_funding ON loans(status, funding_deadline) WHERE status = 'funding';
+CREATE INDEX idx_loan_schedule_loan ON loan_schedule(loan_id);
+CREATE INDEX idx_loan_schedule_due_date ON loan_schedule(due_date) WHERE status IN ('upcoming', 'due', 'late');
+CREATE INDEX idx_funding_commitments_loan ON funding_commitments(loan_id);
+CREATE INDEX idx_funding_commitments_lender ON funding_commitments(lender_id);
+CREATE INDEX idx_transactions_wallet ON transactions(wallet_id, created_at DESC);
+CREATE INDEX idx_transactions_user ON transactions(user_id, created_at DESC);
+CREATE INDEX idx_notifications_user_unread ON notifications(user_id, read) WHERE read = FALSE;
+CREATE INDEX idx_notifications_user_created ON notifications(user_id, created_at DESC);
+CREATE INDEX idx_documents_user ON documents(user_id);
