@@ -26,8 +26,7 @@ interface Listing {
   accepted_purposes: string[]
   max_term_months: number | null
   description: string | null
-  users: { name: string }
-  lender_profiles: { lender_type: string | null; accredited: boolean }
+  users: { name: string; lender_profiles: { lender_type: string | null; accredited: boolean } | null }
 }
 
 export function ListingDetail() {
@@ -113,8 +112,8 @@ export function ListingDetail() {
           <div>
             <p className="font-semibold">{listing.users?.name}</p>
             <p className="text-xs text-muted-foreground capitalize">
-              {listing.lender_profiles?.lender_type ?? 'Individual'} lender
-              {listing.lender_profiles?.accredited && ' · Accredited'}
+              {listing.users?.lender_profiles?.lender_type ?? 'Individual'} lender
+              {listing.users?.lender_profiles?.accredited && ' · Accredited'}
             </p>
           </div>
         </div>

@@ -27,8 +27,7 @@ interface Listing {
   accepted_purposes: string[]
   max_term_months: number | null
   description: string | null
-  users: { name: string; avatar_url: string | null }
-  lender_profiles: { lender_type: string | null; accredited: boolean }
+  users: { name: string; avatar_url: string | null; lender_profiles: { lender_type: string | null; accredited: boolean } | null }
 }
 
 const AVATAR_COLORS = ['bg-emerald-100 text-emerald-700', 'bg-blue-100 text-blue-700', 'bg-amber-100 text-amber-700', 'bg-purple-100 text-purple-700', 'bg-teal-100 text-teal-700']
@@ -116,8 +115,8 @@ export function BrowseListings() {
                       <div>
                         <p className="font-semibold text-sm">{listing.users?.name}</p>
                         <p className="text-xs text-muted-foreground capitalize">
-                          {listing.lender_profiles?.lender_type ?? 'Individual'} lender
-                          {listing.lender_profiles?.accredited && ' · Accredited'}
+                          {listing.users?.lender_profiles?.lender_type ?? 'Individual'} lender
+                          {listing.users?.lender_profiles?.accredited && ' · Accredited'}
                         </p>
                       </div>
                       <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />

@@ -13,8 +13,7 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
     .from('lender_listings')
     .select(`
       *,
-      users!lender_id (name, avatar_url),
-      lender_profiles!lender_id (lender_type, accredited, risk_tolerance)
+      users!lender_id (name, avatar_url, lender_profiles(lender_type, accredited, risk_tolerance))
     `)
     .eq('status', 'active')
     .order('created_at', { ascending: false })
@@ -35,8 +34,7 @@ router.get('/:id', async (req: Request, res: Response): Promise<void> => {
     .from('lender_listings')
     .select(`
       *,
-      users!lender_id (name, avatar_url),
-      lender_profiles!lender_id (lender_type, accredited, risk_tolerance)
+      users!lender_id (name, avatar_url, lender_profiles(lender_type, accredited, risk_tolerance))
     `)
     .eq('id', req.params.id)
     .single()
