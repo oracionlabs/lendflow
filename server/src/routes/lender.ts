@@ -231,72 +231,84 @@ router.get('/portfolio/income-summary', async (req: Request, res: Response): Pro
   })
 })
 
-// List borrowers available for origination
-router.get('/borrowers', async (_req: Request, res: Response): Promise<void> => {
-  const db = supabaseAdmin()
-  const { data, error } = await db
-    .from('users')
-    .select('id, name, email, created_at, borrower_profiles(employment_status, annual_income, credit_score_range, identity_verified)')
-    .eq('role', 'borrower')
-    .eq('status', 'active')
-    .order('name', { ascending: true })
-
-  if (error) { res.status(500).json({ error: error.message }); return }
-  res.json({ borrowers: data })
-})
-
-// Originate a loan on behalf of a borrower
-router.post('/originate', async (req: Request, res: Response): Promise<void> => {
+// Create a new loan — lender enters borrower details directly.
+// If the email matches an existing borrower account, uses it.
+// If not, creates a borrower account automatically.
+router.post('/loans/new', async (req: Request, res: Response): Promise<void> => {
   const lender = res.locals.user
   const {
-    borrower_id,
+    borrower_name,
+    borrower_email,
     purpose,
-    purpose_description,
+    notes,
     amount_requested,
     term_months,
   } = req.body as {
-    borrower_id: string
+    borrower_name: string
+    borrower_email: string
     purpose: string
-    purpose_description?: string
+    notes?: string
     amount_requested: number
     term_months: number
   }
 
-  if (!borrower_id || !purpose || !amount_requested || !term_months) {
-    res.status(400).json({ error: 'borrower_id, purpose, amount_requested, and term_months are required' })
+  if (!borrower_name || !borrower_email || !purpose || !amount_requested || !term_months) {
+    res.status(400).json({ error: 'borrower_name, borrower_email, purpose, amount_requested, and term_months are required' })
     return
   }
 
   const db = supabaseAdmin()
 
-  // Verify borrower exists and is active
-  const { data: borrower } = await db
+  // Find or create borrower
+  let borrowerId: string
+
+  const { data: existing } = await db
     .from('users')
-    .select('id, name, email, borrower_profiles(employment_status, annual_income, monthly_expenses, credit_score_range)')
-    .eq('id', borrower_id)
+    .select('id')
+    .eq('email', borrower_email.toLowerCase().trim())
     .eq('role', 'borrower')
-    .single()
+    .maybeSingle()
 
-  if (!borrower) { res.status(404).json({ error: 'Borrower not found' }); return }
+  if (existing) {
+    borrowerId = existing.id
+  } else {
+    // Create auth + app user for borrower with a temporary password
+    const tempPassword = `LF-${Math.random().toString(36).slice(2, 10)}-${Date.now().toString(36)}`
 
-  // Get platform settings for origination fee & rates
+    const { data: authData, error: authErr } = await db.auth.admin.createUser({
+      email: borrower_email.toLowerCase().trim(),
+      password: tempPassword,
+      email_confirm: true,
+      user_metadata: { name: borrower_name, role: 'borrower' },
+    })
+
+    if (authErr || !authData.user) {
+      res.status(400).json({ error: authErr?.message ?? 'Failed to create borrower account' })
+      return
+    }
+
+    const { error: rpcErr } = await db.rpc('register_user', {
+      p_auth_id: authData.user.id,
+      p_email: borrower_email.toLowerCase().trim(),
+      p_name: borrower_name,
+      p_role: 'borrower',
+    })
+
+    if (rpcErr) {
+      await db.auth.admin.deleteUser(authData.user.id)
+      res.status(500).json({ error: 'Failed to set up borrower profile' })
+      return
+    }
+
+    borrowerId = authData.user.id
+  }
+
   const { data: settings } = await db.from('platform_settings').select('*').single()
   const originationFeePct = settings?.origination_fee_percent ?? 0.02
-
-  // Run AI credit assessment
-  const bp = Array.isArray(borrower.borrower_profiles) ? borrower.borrower_profiles[0] : borrower.borrower_profiles
-  const assessment = await assessCredit({
-    employment_status: bp?.employment_status ?? 'employed',
-    annual_income: bp?.annual_income ?? 0,
-    monthly_expenses: bp?.monthly_expenses ?? 0,
-    credit_score_range: bp?.credit_score_range ?? 'fair',
-    loan_amount: amount_requested,
-    purpose,
-    term_months,
-  }).catch(() => null)
-
-  const grade = assessment?.grade ?? 'C'
   const rateMap: Record<string, number> = settings?.credit_grade_rates ?? { A: 0.055, B: 0.085, C: 0.12, D: 0.165, E: 0.21 }
+
+  // Default to Grade C / 12% for lender-created loans (no financial profile yet)
+  const grade = 'C'
   const rate = rateMap[grade] ?? 0.12
 
   const originationFee = Math.round(amount_requested * originationFeePct)
@@ -308,15 +320,11 @@ router.post('/originate', async (req: Request, res: Response): Promise<void> => 
   const totalRepayment = monthlyPayment * term_months
 
   const { data: loan, error } = await db.from('loans').insert({
-    borrower_id,
+    borrower_id: borrowerId,
     amount_requested,
     purpose,
-    purpose_description: purpose_description ?? `Originated by lender on behalf of ${borrower.name}`,
+    purpose_description: notes ?? '',
     term_months,
-    ai_credit_grade: grade,
-    ai_confidence: assessment?.confidence ?? 0.75,
-    ai_reasoning: assessment?.reasoning ?? 'AI assessment unavailable',
-    ai_risk_factors: assessment?.risk_factors ?? [],
     approved_amount: amount_requested,
     interest_rate: rate,
     monthly_payment: monthlyPayment,
@@ -333,7 +341,7 @@ router.post('/originate', async (req: Request, res: Response): Promise<void> => 
   }).select().single()
 
   if (error) { res.status(500).json({ error: error.message }); return }
-  res.status(201).json({ loan, assessment })
+  res.status(201).json({ loan, borrower_created: !existing })
 })
 
 export default router

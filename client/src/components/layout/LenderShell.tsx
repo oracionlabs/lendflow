@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils'
 const navItems = [
   { to: '/lender', label: 'Portfolio', icon: LayoutDashboard, end: true },
   { to: '/lender/opportunities', label: 'Opportunities', icon: Search },
-  { to: '/lender/originate', label: 'Originate Loan', icon: FilePlus },
+  { to: '/lender/new-loan', label: 'New Loan', icon: FilePlus },
   { to: '/lender/reports', label: 'Reports', icon: BarChart2 },
   { to: '/lender/profile', label: 'Profile', icon: User },
 ]

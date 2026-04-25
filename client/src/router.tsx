@@ -61,7 +61,7 @@ export const router = createBrowserRouter([
         { path: '/lender/opportunities', element: <OpportunitiesBoard /> },
         { path: '/lender/opportunities/:id', element: <OpportunityDetail /> },
         { path: '/lender/commitments/:id', element: <CommitmentDetail /> },
-        { path: '/lender/originate', element: <LoanOrigination /> },
+        { path: '/lender/new-loan', element: <LoanOrigination /> },
         { path: '/lender/profile', element: <LenderProfilePage /> },
         { path: '/lender/reports', element: <LenderReports /> },
       ],
