@@ -312,6 +312,28 @@ export function LoanOrigination() {
             </div>
           </div>
 
+          <div>
+            <Label>Repayment type <span className="text-destructive">*</span></Label>
+            <div className="grid grid-cols-2 gap-3">
+              {([
+                { v: 'installments' as PaymentType, label: 'Monthly installments', desc: 'Fixed payments each month' },
+                { v: 'lump_sum' as PaymentType, label: 'Single repayment', desc: 'Full amount on a due date' },
+              ]).map(opt => (
+                <button
+                  key={opt.v}
+                  type="button"
+                  onClick={() => set('payment_type', opt.v)}
+                  className={`rounded-xl border-2 p-4 text-left transition-all ${
+                    form.payment_type === opt.v ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40'
+                  }`}
+                >
+                  <p className="text-sm font-semibold">{opt.label}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{opt.desc}</p>
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="space-y-2">
             <Label>Interest rate <span className="text-destructive">*</span></Label>
             <div className="relative">
@@ -345,28 +367,6 @@ export function LoanOrigination() {
             <p className="text-xs text-muted-foreground">
               {RATE_OPTIONS.find(o => o.value === form.rate_period)?.desc}
             </p>
-          </div>
-
-          <div>
-            <Label>Repayment type <span className="text-destructive">*</span></Label>
-            <div className="grid grid-cols-2 gap-3">
-              {([
-                { v: 'installments' as PaymentType, label: 'Monthly installments', desc: 'Fixed payments each month' },
-                { v: 'lump_sum' as PaymentType, label: 'Single repayment', desc: 'Full amount on a due date' },
-              ]).map(opt => (
-                <button
-                  key={opt.v}
-                  type="button"
-                  onClick={() => set('payment_type', opt.v)}
-                  className={`rounded-xl border-2 p-4 text-left transition-all ${
-                    form.payment_type === opt.v ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40'
-                  }`}
-                >
-                  <p className="text-sm font-semibold">{opt.label}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{opt.desc}</p>
-                </button>
-              ))}
-            </div>
           </div>
 
           {form.payment_type === 'installments' && (
