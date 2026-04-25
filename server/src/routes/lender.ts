@@ -244,6 +244,8 @@ router.post('/loans/new', async (req: Request, res: Response): Promise<void> => 
     notes,
     amount_requested,
     interest_rate,
+    monthly_payment: clientMonthlyPayment,
+    total_repayment: clientTotalRepayment,
     payment_type,
     due_date,
     term_months: termMonthsInput,
@@ -255,13 +257,15 @@ router.post('/loans/new', async (req: Request, res: Response): Promise<void> => 
     notes?: string
     amount_requested: number
     interest_rate: number
+    monthly_payment: number
+    total_repayment: number
     payment_type: 'lump_sum' | 'installments'
     due_date?: string
     term_months?: number
   }
 
-  if (!borrower_name || !purpose || !amount_requested || !interest_rate || !payment_type) {
-    res.status(400).json({ error: 'borrower_name, purpose, amount_requested, interest_rate, and payment_type are required' })
+  if (!borrower_name || !purpose || !amount_requested || !payment_type) {
+    res.status(400).json({ error: 'borrower_name, purpose, amount_requested, and payment_type are required' })
     return
   }
   if (payment_type === 'lump_sum' && !due_date) {
@@ -339,11 +343,12 @@ router.post('/loans/new', async (req: Request, res: Response): Promise<void> => 
     await db.from('notification_preferences').insert({ user_id: borrowerId })
   }
 
-  // Calculate term and schedule
+  // Use client-calculated values (client owns rate structure logic)
   const today = new Date()
   const firstPaymentDate = new Date(today)
   firstPaymentDate.setMonth(firstPaymentDate.getMonth() + 1)
   firstPaymentDate.setDate(1)
+  const firstPaymentStr = firstPaymentDate.toISOString().split('T')[0]
 
   let term_months: number
   let maturityDate: string
@@ -361,24 +366,8 @@ router.post('/loans/new', async (req: Request, res: Response): Promise<void> => 
     maturityDate = mat.toISOString().split('T')[0]
   }
 
-  // Payment calculation
-  const r = interest_rate / 12
-  let monthlyPayment: number
-  let totalRepayment: number
-
-  if (payment_type === 'lump_sum') {
-    // Single bullet repayment: principal + simple interest
-    const interest = Math.round(amount_requested * interest_rate * (term_months / 12))
-    totalRepayment = amount_requested + interest
-    monthlyPayment = totalRepayment // paid as one lump sum
-  } else {
-    monthlyPayment = r === 0
-      ? Math.round(amount_requested / term_months)
-      : Math.round((amount_requested * (r * Math.pow(1 + r, term_months))) / (Math.pow(1 + r, term_months) - 1))
-    totalRepayment = monthlyPayment * term_months
-  }
-
-  const firstPaymentStr = firstPaymentDate.toISOString().split('T')[0]
+  const monthlyPayment = clientMonthlyPayment ?? 0
+  const totalRepayment = clientTotalRepayment ?? amount_requested
 
   // Create loan as active (funds already sent by lender)
   const { data: loan, error: loanErr } = await db.from('loans').insert({
