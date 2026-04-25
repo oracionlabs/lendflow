@@ -1,13 +1,22 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import api from '@/lib/api'
 import { formatCents } from '@/lib/utils'
 import { toast } from 'sonner'
-import { LOAN_PURPOSE_LABELS, SUPPORTED_TERMS } from '@lendflow/shared'
+import { LOAN_PURPOSE_LABELS } from '@lendflow/shared'
 import { CheckCircle2 } from 'lucide-react'
 
 const PURPOSES = Object.entries(LOAN_PURPOSE_LABELS)
+
+function monthsBetween(from: Date, to: Date): number {
+  return Math.max(1, (to.getFullYear() - from.getFullYear()) * 12 + (to.getMonth() - from.getMonth()))
+}
+
+// Minimum due date is 1 month from today
+const minDueDate = new Date()
+minDueDate.setMonth(minDueDate.getMonth() + 1)
+const minDueDateStr = minDueDate.toISOString().split('T')[0]
 
 interface NewLoanResult {
   loan: {
@@ -29,13 +38,18 @@ export function LoanOrigination() {
     purpose: 'personal',
     notes: '',
     amount_requested: 1000000,
-    term_months: 24,
+    due_date: '',
   })
+
+  const term_months = useMemo(() => {
+    if (!form.due_date) return 0
+    return monthsBetween(new Date(), new Date(form.due_date))
+  }, [form.due_date])
   const [result, setResult] = useState<NewLoanResult | null>(null)
 
   const create = useMutation({
     mutationFn: async () => {
-      const { data } = await api.post<NewLoanResult>('/api/lender/loans/new', form)
+      const { data } = await api.post<NewLoanResult>('/api/lender/loans/new', { ...form, term_months })
       return data
     },
     onSuccess: (data) => setResult(data),
@@ -76,7 +90,7 @@ export function LoanOrigination() {
             View Opportunities
           </button>
           <button
-            onClick={() => { setResult(null); setForm({ borrower_name: '', borrower_email: '', purpose: 'personal', notes: '', amount_requested: 1000000, term_months: 24 }) }}
+            onClick={() => { setResult(null); setForm({ borrower_name: '', borrower_email: '', purpose: 'personal', notes: '', amount_requested: 1000000, due_date: '' }) }}
             className="flex-1 rounded-lg border py-2.5 text-sm font-medium hover:bg-muted"
           >
             New Loan
@@ -86,7 +100,7 @@ export function LoanOrigination() {
     )
   }
 
-  const isValid = form.borrower_name.trim() && form.borrower_email.trim() && form.amount_requested > 0
+  const isValid = form.borrower_name.trim() && form.borrower_email.trim() && form.amount_requested > 0 && form.due_date
 
   return (
     <div className="max-w-lg space-y-6">
@@ -160,21 +174,17 @@ export function LoanOrigination() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1.5">Term</label>
-              <div className="flex gap-2 flex-wrap">
-                {SUPPORTED_TERMS.map(t => (
-                  <button
-                    key={t}
-                    type="button"
-                    onClick={() => setForm(f => ({ ...f, term_months: t }))}
-                    className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
-                      form.term_months === t ? 'bg-primary text-white' : 'border border-border hover:bg-muted'
-                    }`}
-                  >
-                    {t}mo
-                  </button>
-                ))}
-              </div>
+              <label className="block text-sm font-medium mb-1.5">Due Date</label>
+              <input
+                type="date"
+                value={form.due_date}
+                min={minDueDateStr}
+                onChange={set('due_date')}
+                className="w-full rounded-lg border bg-background px-3 py-2.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              />
+              {form.due_date && (
+                <p className="text-xs text-muted-foreground mt-1">{term_months} month{term_months !== 1 ? 's' : ''} from today</p>
+              )}
             </div>
 
             <div>
