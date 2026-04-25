@@ -70,7 +70,7 @@ export function LenderShell() {
           <div className="hidden md:block text-sm font-semibold">Capital Partner Portal</div>
           <div className="flex items-center gap-2">
             <Link to="/lender/new-loan"
-              className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-white hover:bg-primary/90 transition-colors shadow-sm">
+              className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-white hover:bg-primary/90 shadow-sm">
               <Plus className="h-4 w-4" />
               <span className="hidden sm:inline">New Loan</span>
             </Link>
@@ -98,12 +98,8 @@ export function LenderShell() {
                   isActive ? 'text-primary' : 'text-muted-foreground'
                 )}
               >
-                {({ isActive }) => (
-                  <>
-                    <Icon className={cn('h-5 w-5', isActive ? 'text-primary' : 'text-muted-foreground')} />
-                    <span>{label}</span>
-                  </>
-                )}
+                <Icon className="h-5 w-5" />
+                <span>{label}</span>
               </NavLink>
             ))}
           </div>

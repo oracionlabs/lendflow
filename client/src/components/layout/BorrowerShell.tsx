@@ -79,13 +79,12 @@ export function BorrowerShell() {
           </div>
         </header>
 
-        {/* Page content — extra bottom padding for mobile nav */}
         <main className="flex-1 overflow-y-auto p-4 pb-24 md:p-6 md:pb-6">
           <Outlet />
         </main>
 
-        {/* Mobile bottom navigation */}
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-border z-40 safe-area-inset-bottom">
+        {/* Mobile bottom nav */}
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-border z-40">
           <div className="flex">
             {navItems.map(({ to, label, icon: Icon, end }) => (
               <NavLink key={to} to={to} end={end}
@@ -94,12 +93,8 @@ export function BorrowerShell() {
                   isActive ? 'text-primary' : 'text-muted-foreground'
                 )}
               >
-                {({ isActive }) => (
-                  <>
-                    <Icon className={cn('h-5 w-5', isActive ? 'text-primary' : 'text-muted-foreground')} />
-                    <span>{label}</span>
-                  </>
-                )}
+                <Icon className="h-5 w-5" />
+                <span>{label}</span>
               </NavLink>
             ))}
           </div>
