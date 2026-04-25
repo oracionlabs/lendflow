@@ -18,6 +18,7 @@ import fundingRouter from './routes/funding'
 import walletRouter from './routes/wallet'
 import notificationsRouter from './routes/notifications'
 import reportsRouter from './routes/reports'
+import listingsRouter from './routes/listings'
 import adminRouter from './routes/admin/index'
 
 const ALLOWED_ORIGINS = [
@@ -46,6 +47,7 @@ export function createApp() {
   app.use('/api/wallet', requireAuth, walletRouter)
   app.use('/api/notifications', requireAuth, notificationsRouter)
   app.use('/api/reports', requireAuth, reportsRouter)
+  app.use('/api/listings', requireAuth, listingsRouter)
   app.use('/api/admin', requireAuth, requireAdmin, adminRouter)
 
   app.use(errorHandler as unknown as (err: unknown, req: Request, res: Response, next: NextFunction) => void)

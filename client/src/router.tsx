@@ -9,14 +9,15 @@ import { RegisterPage } from '@/features/auth/RegisterPage'
 import { AuthCallbackPage } from '@/features/auth/AuthCallbackPage'
 
 import { BorrowerDashboard } from '@/features/borrower/BorrowerDashboard'
-import { LoanApplicationForm } from '@/features/borrower/LoanApplicationForm'
+import { BrowseListings } from '@/features/borrower/BrowseListings'
+import { ListingDetail } from '@/features/borrower/ListingDetail'
 import { ActiveLoanDetail } from '@/features/borrower/ActiveLoanDetail'
 import { BorrowerProfilePage } from '@/features/borrower/BorrowerProfile'
 import { BorrowerReports } from '@/features/borrower/BorrowerReports'
 
 import { PortfolioDashboard } from '@/features/lender/PortfolioDashboard'
-import { OpportunitiesBoard } from '@/features/lender/OpportunitiesBoard'
-import { OpportunityDetail } from '@/features/lender/OpportunityDetail'
+import { MyListing } from '@/features/lender/MyListing'
+import { LoanRequests } from '@/features/lender/LoanRequests'
 import { CommitmentDetail } from '@/features/lender/CommitmentDetail'
 import { LoanOrigination } from '@/features/lender/LoanOrigination'
 import { LenderProfilePage } from '@/features/lender/LenderProfilePage'
@@ -43,11 +44,12 @@ export const router = createBrowserRouter([
       element: <BorrowerShell />,
       children: [
         { path: '/borrower', element: <BorrowerDashboard /> },
-        { path: '/borrower/apply', element: <LoanApplicationForm /> },
+        { path: '/borrower/lenders', element: <BrowseListings /> },
+        { path: '/borrower/lenders/:id', element: <ListingDetail /> },
         { path: '/borrower/loans', element: <BorrowerDashboard /> },
         { path: '/borrower/loans/:id', element: <ActiveLoanDetail /> },
-        { path: '/borrower/profile', element: <BorrowerProfilePage /> },
         { path: '/borrower/reports', element: <BorrowerReports /> },
+        { path: '/borrower/profile', element: <BorrowerProfilePage /> },
       ],
     }],
   },
@@ -58,12 +60,13 @@ export const router = createBrowserRouter([
       element: <LenderShell />,
       children: [
         { path: '/lender', element: <PortfolioDashboard /> },
-        { path: '/lender/opportunities', element: <OpportunitiesBoard /> },
-        { path: '/lender/opportunities/:id', element: <OpportunityDetail /> },
+        { path: '/lender/listing', element: <MyListing /> },
+        { path: '/lender/requests', element: <LoanRequests /> },
+        { path: '/lender/loans', element: <PortfolioDashboard /> },
         { path: '/lender/commitments/:id', element: <CommitmentDetail /> },
         { path: '/lender/new-loan', element: <LoanOrigination /> },
-        { path: '/lender/profile', element: <LenderProfilePage /> },
         { path: '/lender/reports', element: <LenderReports /> },
+        { path: '/lender/profile', element: <LenderProfilePage /> },
       ],
     }],
   },
