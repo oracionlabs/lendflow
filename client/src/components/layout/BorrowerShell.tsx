@@ -69,6 +69,7 @@ export function BorrowerShell() {
           </div>
           <div className="hidden md:block text-sm font-semibold">Borrower Portal</div>
           <div className="flex items-center gap-2">
+            <button onClick={async () => { await signOut(); navigate('/login') }} className="md:hidden rounded-lg border border-border p-2 text-muted-foreground hover:bg-muted hover:text-destructive transition-colors"><LogOut className="h-4 w-4" /></button>
             <NotificationBell />
             <div className="flex items-center gap-1.5 rounded-full border border-border bg-muted/50 px-2.5 py-1.5">
               <div className="h-4 w-4 rounded-full bg-primary/15 flex items-center justify-center">

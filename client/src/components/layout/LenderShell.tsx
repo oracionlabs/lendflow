@@ -69,6 +69,7 @@ export function LenderShell() {
           </div>
           <div className="hidden md:block text-sm font-semibold">Capital Partner Portal</div>
           <div className="flex items-center gap-2">
+            <button onClick={async () => { await signOut(); navigate('/login') }} className="md:hidden rounded-lg border border-border p-2 text-muted-foreground hover:bg-muted hover:text-destructive transition-colors"><LogOut className="h-4 w-4" /></button>
             <Link to="/lender/new-loan"
               className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-white hover:bg-primary/90 shadow-sm">
               <Plus className="h-4 w-4" />
