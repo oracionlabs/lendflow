@@ -1,13 +1,12 @@
-import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
+import { Outlet, NavLink, useNavigate, useLocation, Link } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
 import { NotificationBell } from './NotificationBell'
-import { LayoutDashboard, Search, User, BarChart2, FilePlus, LogOut } from 'lucide-react'
+import { LayoutDashboard, Search, User, BarChart2, LogOut, Plus } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const navItems = [
   { to: '/lender', label: 'Portfolio', icon: LayoutDashboard, end: true },
   { to: '/lender/opportunities', label: 'Opportunities', icon: Search },
-  { to: '/lender/new-loan', label: 'New Loan', icon: FilePlus },
   { to: '/lender/reports', label: 'Reports', icon: BarChart2 },
   { to: '/lender/profile', label: 'Profile', icon: User },
 ]
@@ -73,8 +72,17 @@ export function LenderShell() {
 
       <div className="flex-1 flex flex-col min-w-0">
         <header className="h-14 bg-white border-b border-border flex items-center justify-between px-6 shadow-sm">
-          <h2 className="text-sm font-semibold text-foreground">{currentPage?.label ?? 'Portfolio'}</h2>
+          <h2 className="text-sm font-semibold text-foreground">
+            {location.pathname === '/lender/new-loan' ? 'New Loan' : currentPage?.label ?? 'Portfolio'}
+          </h2>
           <div className="flex items-center gap-3">
+            <Link
+              to="/lender/new-loan"
+              className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary/90 transition-colors shadow-sm"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              New Loan
+            </Link>
             <NotificationBell />
             <div className="flex items-center gap-2 rounded-full border border-border bg-muted/50 px-3 py-1.5">
               <div className="h-5 w-5 rounded-full bg-primary/15 flex items-center justify-center">
