@@ -10,6 +10,7 @@ import { CheckCircle2, Upload, X, ArrowRight, ArrowLeft } from 'lucide-react'
 const PURPOSES = Object.entries(LOAN_PURPOSE_LABELS)
 
 type PaymentType = 'lump_sum' | 'installments'
+type RateType = 'annual' | 'flat'
 type Step = 1 | 2 | 3 | 4
 
 interface Form {
@@ -20,6 +21,7 @@ interface Form {
   notes: string
   amount: number
   interest_rate: number
+  rate_type: RateType
   payment_type: PaymentType
   due_date: string
   term_months: number
@@ -33,6 +35,7 @@ const INITIAL: Form = {
   notes: '',
   amount: 1000000,
   interest_rate: 12,
+  rate_type: 'annual',
   payment_type: 'installments',
   due_date: '',
   term_months: 12,
@@ -74,19 +77,40 @@ export function LoanOrigination() {
     return form.term_months
   }, [form.payment_type, form.due_date, form.term_months])
 
-  const { monthlyPayment, totalRepayment, totalInterest } = useMemo(() => {
-    const r = (form.interest_rate / 100) / 12
+  const { monthlyPayment, totalRepayment, totalInterest, annualRate } = useMemo(() => {
     const p = form.amount
-    if (form.payment_type === 'lump_sum') {
-      const interest = Math.round(p * (form.interest_rate / 100) * (term / 12))
-      return { monthlyPayment: p + interest, totalRepayment: p + interest, totalInterest: interest }
+    const rate = form.interest_rate / 100
+
+    // Derive annual rate (for server) and total interest
+    let totalInt: number
+    let annualR: number
+
+    if (form.rate_type === 'flat') {
+      // Flat: borrower pays back principal + (rate% of principal) regardless of duration
+      totalInt = Math.round(p * rate)
+      annualR = term > 0 ? rate / (term / 12) : rate
+    } else {
+      // Annual: standard APR
+      if (form.payment_type === 'lump_sum') {
+        totalInt = Math.round(p * rate * (term / 12))
+      } else {
+        const r = rate / 12
+        const monthly = r === 0 ? Math.round(p / term)
+          : Math.round((p * (r * Math.pow(1 + r, term))) / (Math.pow(1 + r, term) - 1))
+        totalInt = monthly * term - p
+      }
+      annualR = rate
     }
-    const monthly = r === 0
-      ? Math.round(p / term)
-      : Math.round((p * (r * Math.pow(1 + r, term))) / (Math.pow(1 + r, term) - 1))
-    const total = monthly * term
-    return { monthlyPayment: monthly, totalRepayment: total, totalInterest: total - p }
-  }, [form.amount, form.interest_rate, form.payment_type, term])
+
+    const totalRep = p + totalInt
+
+    if (form.payment_type === 'lump_sum') {
+      return { monthlyPayment: totalRep, totalRepayment: totalRep, totalInterest: totalInt, annualRate: annualR }
+    }
+
+    const monthly = term > 0 ? Math.round(totalRep / term) : 0
+    return { monthlyPayment: monthly, totalRepayment: monthly * term, totalInterest: monthly * term - p, annualRate: annualR }
+  }, [form.amount, form.interest_rate, form.rate_type, form.payment_type, term])
 
   const create = useMutation({
     mutationFn: async () => {
@@ -97,7 +121,7 @@ export function LoanOrigination() {
         purpose: form.purpose,
         notes: form.notes || undefined,
         amount_requested: form.amount,
-        interest_rate: form.interest_rate / 100,
+        interest_rate: annualRate,
         payment_type: form.payment_type,
         due_date: form.payment_type === 'lump_sum' ? form.due_date : undefined,
         term_months: form.payment_type === 'installments' ? form.term_months : undefined,
@@ -242,19 +266,43 @@ export function LoanOrigination() {
           </div>
 
           <div>
-            <Label>Annual interest rate <span className="text-destructive">*</span></Label>
-            <div className="relative">
-              <input
-                type="number"
-                value={form.interest_rate}
-                onChange={e => set('interest_rate', parseFloat(e.target.value || '0'))}
-                min={0}
-                max={100}
-                step={0.5}
-                className="w-full rounded-lg border bg-white pl-3 pr-8 py-2.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-              />
-              <span className="absolute right-3 top-2.5 text-muted-foreground text-sm">%</span>
+            <Label>Interest rate <span className="text-destructive">*</span></Label>
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <input
+                  type="number"
+                  value={form.interest_rate}
+                  onChange={e => set('interest_rate', parseFloat(e.target.value || '0'))}
+                  min={0}
+                  max={100}
+                  step={0.5}
+                  className="w-full rounded-lg border bg-white pl-3 pr-8 py-2.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                />
+                <span className="absolute right-3 top-2.5 text-muted-foreground text-sm">%</span>
+              </div>
+              <div className="flex rounded-lg border bg-white overflow-hidden text-xs font-medium">
+                {([
+                  { v: 'annual' as RateType, label: 'Per year' },
+                  { v: 'flat' as RateType, label: 'Flat' },
+                ] as { v: RateType; label: string }[]).map(opt => (
+                  <button
+                    key={opt.v}
+                    type="button"
+                    onClick={() => set('rate_type', opt.v)}
+                    className={`px-3 py-2.5 transition-colors ${
+                      form.rate_type === opt.v ? 'bg-primary text-white' : 'text-muted-foreground hover:bg-muted'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
             </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {form.rate_type === 'flat'
+                ? `Borrower repays ${form.interest_rate}% of the principal on top of the amount — regardless of duration.`
+                : 'Standard annual percentage rate (APR).'}
+            </p>
           </div>
 
           <div>
@@ -344,7 +392,7 @@ export function LoanOrigination() {
                 form.borrower_email ? { label: 'Email', value: form.borrower_email } : null,
                 form.borrower_phone ? { label: 'Phone', value: form.borrower_phone } : null,
                 { label: 'Amount', value: formatCents(form.amount) },
-                { label: 'Interest rate', value: `${form.interest_rate}% per year` },
+                { label: 'Interest rate', value: form.rate_type === 'flat' ? `${form.interest_rate}% flat` : `${form.interest_rate}% per year` },
                 {
                   label: form.payment_type === 'lump_sum' ? 'Repayment' : 'Monthly payment',
                   value: form.payment_type === 'lump_sum'
