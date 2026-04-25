@@ -109,21 +109,21 @@ export function ActiveLoanDetail() {
       {['active', 'repaying', 'completed'].includes(loan.status) && (
         <>
           <div className="grid grid-cols-3 gap-4">
-            <div className="rounded-lg border bg-card p-4">
+            <div className="card-base p-4">
               <p className="text-xs text-muted-foreground">Monthly Payment</p>
               <p className="text-xl font-bold mt-1">{formatCents(loan.monthly_payment ?? 0)}</p>
             </div>
-            <div className="rounded-lg border bg-card p-4">
+            <div className="card-base p-4">
               <p className="text-xs text-muted-foreground">Interest Rate</p>
               <p className="text-xl font-bold mt-1">{formatPercent(loan.interest_rate ?? 0)}</p>
             </div>
-            <div className="rounded-lg border bg-card p-4">
+            <div className="card-base p-4">
               <p className="text-xs text-muted-foreground">Total Repayment</p>
               <p className="text-xl font-bold mt-1">{formatCents(loan.total_repayment ?? 0)}</p>
             </div>
           </div>
 
-          <div className="rounded-lg border bg-card p-5 space-y-3">
+          <div className="card-base p-5 space-y-3">
             <div className="flex justify-between text-sm">
               <span className="font-medium">Repayment Progress</span>
               <span className="text-muted-foreground">{progressPct.toFixed(0)}% paid</span>
@@ -138,7 +138,7 @@ export function ActiveLoanDetail() {
           </div>
 
           {nextDue && loan.status !== 'completed' && (
-            <div className="rounded-lg border bg-card p-5 space-y-4">
+            <div className="card-base p-5 space-y-4">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="font-semibold">Next Payment Due</p>
@@ -190,7 +190,7 @@ export function ActiveLoanDetail() {
                   <button
                     onClick={handlePayment}
                     disabled={paying || (payMode === 'custom' && !payAmount) || (walletData?.available_balance ?? 0) < (nextDue.total_due + nextDue.late_fee)}
-                    className="rounded-md bg-primary px-6 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
+                    className="rounded-lg bg-primary px-6 py-2 text-sm font-semibold text-white hover:bg-primary/90 disabled:opacity-50 transition-colors"
                   >
                     {paying ? 'Processing…' : 'Make Payment'}
                   </button>
@@ -222,9 +222,9 @@ export function ActiveLoanDetail() {
       <section>
         <h2 className="text-lg font-semibold mb-3">Payment Schedule</h2>
         {schedLoading ? <TableSkeleton /> : (
-          <div className="rounded-lg border overflow-hidden">
+          <div className="card-base overflow-hidden">
             <table className="w-full text-sm">
-              <thead className="bg-muted/50 border-b">
+              <thead className="bg-muted/30 border-b border-border">
                 <tr>
                   <th className="text-left p-3 font-medium">#</th>
                   <th className="text-left p-3 font-medium">Due Date</th>
@@ -256,7 +256,7 @@ export function ActiveLoanDetail() {
       {loan.ai_reasoning && (
         <section>
           <h2 className="text-lg font-semibold mb-3">Credit Assessment</h2>
-          <div className="rounded-lg border bg-card p-5 space-y-3">
+          <div className="card-base p-5 space-y-3">
             <div className="flex items-center gap-3">
               <CreditGradeBadge grade={loan.admin_override_grade ?? loan.ai_credit_grade} />
               {loan.ai_confidence && (

@@ -1,12 +1,13 @@
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
 import { NotificationBell } from './NotificationBell'
-import { LayoutDashboard, Search, User, BarChart2, LogOut } from 'lucide-react'
+import { LayoutDashboard, Search, User, BarChart2, FilePlus, LogOut } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const navItems = [
   { to: '/lender', label: 'Portfolio', icon: LayoutDashboard, end: true },
   { to: '/lender/opportunities', label: 'Opportunities', icon: Search },
+  { to: '/lender/originate', label: 'Originate Loan', icon: FilePlus },
   { to: '/lender/reports', label: 'Reports', icon: BarChart2 },
   { to: '/lender/profile', label: 'Profile', icon: User },
 ]

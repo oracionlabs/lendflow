@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express'
 import { supabaseAdmin } from '../lib/supabase'
+import { assessCredit } from '../lib/credit-assessment'
 
 const router = Router()
 
@@ -228,6 +229,111 @@ router.get('/portfolio/income-summary', async (req: Request, res: Response): Pro
     total_interest_income: totalInterest,
     by_loan: Object.entries(byLoan).map(([loan_id, v]) => ({ loan_id, ...v })),
   })
+})
+
+// List borrowers available for origination
+router.get('/borrowers', async (_req: Request, res: Response): Promise<void> => {
+  const db = supabaseAdmin()
+  const { data, error } = await db
+    .from('users')
+    .select('id, name, email, created_at, borrower_profiles(employment_status, annual_income, credit_score_range, identity_verified)')
+    .eq('role', 'borrower')
+    .eq('status', 'active')
+    .order('name', { ascending: true })
+
+  if (error) { res.status(500).json({ error: error.message }); return }
+  res.json({ borrowers: data })
+})
+
+// Originate a loan on behalf of a borrower
+router.post('/originate', async (req: Request, res: Response): Promise<void> => {
+  const lender = res.locals.user
+  const {
+    borrower_id,
+    purpose,
+    purpose_description,
+    amount_requested,
+    term_months,
+  } = req.body as {
+    borrower_id: string
+    purpose: string
+    purpose_description?: string
+    amount_requested: number
+    term_months: number
+  }
+
+  if (!borrower_id || !purpose || !amount_requested || !term_months) {
+    res.status(400).json({ error: 'borrower_id, purpose, amount_requested, and term_months are required' })
+    return
+  }
+
+  const db = supabaseAdmin()
+
+  // Verify borrower exists and is active
+  const { data: borrower } = await db
+    .from('users')
+    .select('id, name, email, borrower_profiles(employment_status, annual_income, monthly_expenses, credit_score_range)')
+    .eq('id', borrower_id)
+    .eq('role', 'borrower')
+    .single()
+
+  if (!borrower) { res.status(404).json({ error: 'Borrower not found' }); return }
+
+  // Get platform settings for origination fee & rates
+  const { data: settings } = await db.from('platform_settings').select('*').single()
+  const originationFeePct = settings?.origination_fee_percent ?? 0.02
+
+  // Run AI credit assessment
+  const bp = Array.isArray(borrower.borrower_profiles) ? borrower.borrower_profiles[0] : borrower.borrower_profiles
+  const assessment = await assessCredit({
+    employment_status: bp?.employment_status ?? 'employed',
+    annual_income: bp?.annual_income ?? 0,
+    monthly_expenses: bp?.monthly_expenses ?? 0,
+    credit_score_range: bp?.credit_score_range ?? 'fair',
+    loan_amount: amount_requested,
+    purpose,
+    term_months,
+  }).catch(() => null)
+
+  const grade = assessment?.grade ?? 'C'
+  const rateMap: Record<string, number> = settings?.credit_grade_rates ?? { A: 0.055, B: 0.085, C: 0.12, D: 0.165, E: 0.21 }
+  const rate = rateMap[grade] ?? 0.12
+
+  const originationFee = Math.round(amount_requested * originationFeePct)
+  const net = amount_requested - originationFee
+  const r = rate / 12
+  const monthlyPayment = r === 0
+    ? Math.round(net / term_months)
+    : Math.round((net * (r * Math.pow(1 + r, term_months))) / (Math.pow(1 + r, term_months) - 1))
+  const totalRepayment = monthlyPayment * term_months
+
+  const { data: loan, error } = await db.from('loans').insert({
+    borrower_id,
+    amount_requested,
+    purpose,
+    purpose_description: purpose_description ?? `Originated by lender on behalf of ${borrower.name}`,
+    term_months,
+    ai_credit_grade: grade,
+    ai_confidence: assessment?.confidence ?? 0.75,
+    ai_reasoning: assessment?.reasoning ?? 'AI assessment unavailable',
+    ai_risk_factors: assessment?.risk_factors ?? [],
+    approved_amount: amount_requested,
+    interest_rate: rate,
+    monthly_payment: monthlyPayment,
+    total_repayment: totalRepayment,
+    origination_fee: originationFee,
+    origination_fee_percent: originationFeePct,
+    amount_funded: 0,
+    funding_percent: 0,
+    lender_count: 0,
+    status: 'approved',
+    reviewed_by: lender.id,
+    reviewed_at: new Date().toISOString(),
+    funding_deadline: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+  }).select().single()
+
+  if (error) { res.status(500).json({ error: error.message }); return }
+  res.status(201).json({ loan, assessment })
 })
 
 export default router

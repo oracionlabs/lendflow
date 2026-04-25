@@ -95,7 +95,7 @@ export function LoanApplicationForm() {
                 min={1000}
                 max={50000}
                 step={100}
-                className="w-full rounded-md border bg-background pl-7 pr-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="w-full rounded-lg border bg-white pl-7 pr-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               />
             </div>
             <p className="mt-1 text-xs text-muted-foreground">Between $1,000 and $50,000</p>
@@ -106,7 +106,7 @@ export function LoanApplicationForm() {
             <select
               value={form.purpose}
               onChange={e => setForm(f => ({ ...f, purpose: e.target.value }))}
-              className="w-full rounded-md border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="w-full rounded-lg border bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               {purposes.map(([val, label]) => <option key={val} value={val}>{label}</option>)}
             </select>
@@ -119,7 +119,7 @@ export function LoanApplicationForm() {
               onChange={e => setForm(f => ({ ...f, purpose_description: e.target.value }))}
               rows={3}
               placeholder="Tell us more about how you'll use this loan..."
-              className="w-full rounded-md border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-none"
+              className="w-full rounded-lg border bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-none"
             />
           </div>
         </div>
@@ -169,7 +169,7 @@ export function LoanApplicationForm() {
             <select
               value={form.employment_status}
               onChange={e => setForm(f => ({ ...f, employment_status: e.target.value }))}
-              className="w-full rounded-md border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="w-full rounded-lg border bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <option value="employed">Employed</option>
               <option value="self_employed">Self-Employed</option>
@@ -188,7 +188,7 @@ export function LoanApplicationForm() {
                 onChange={e => setForm(f => ({ ...f, annual_income: Math.round(parseFloat(e.target.value || '0') * 100) }))}
                 min={0}
                 step={1000}
-                className="w-full rounded-md border bg-background pl-7 pr-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="w-full rounded-lg border bg-white pl-7 pr-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               />
             </div>
           </div>
@@ -202,7 +202,7 @@ export function LoanApplicationForm() {
                 onChange={e => setForm(f => ({ ...f, monthly_expenses: Math.round(parseFloat(e.target.value || '0') * 100) }))}
                 min={0}
                 step={100}
-                className="w-full rounded-md border bg-background pl-7 pr-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="w-full rounded-lg border bg-white pl-7 pr-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               />
             </div>
           </div>

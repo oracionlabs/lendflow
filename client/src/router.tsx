@@ -17,6 +17,8 @@ import { BorrowerReports } from '@/features/borrower/BorrowerReports'
 import { PortfolioDashboard } from '@/features/lender/PortfolioDashboard'
 import { OpportunitiesBoard } from '@/features/lender/OpportunitiesBoard'
 import { OpportunityDetail } from '@/features/lender/OpportunityDetail'
+import { CommitmentDetail } from '@/features/lender/CommitmentDetail'
+import { LoanOrigination } from '@/features/lender/LoanOrigination'
 import { LenderProfilePage } from '@/features/lender/LenderProfilePage'
 import { LenderReports } from '@/features/lender/LenderReports'
 
@@ -58,6 +60,8 @@ export const router = createBrowserRouter([
         { path: '/lender', element: <PortfolioDashboard /> },
         { path: '/lender/opportunities', element: <OpportunitiesBoard /> },
         { path: '/lender/opportunities/:id', element: <OpportunityDetail /> },
+        { path: '/lender/commitments/:id', element: <CommitmentDetail /> },
+        { path: '/lender/originate', element: <LoanOrigination /> },
         { path: '/lender/profile', element: <LenderProfilePage /> },
         { path: '/lender/reports', element: <LenderReports /> },
       ],

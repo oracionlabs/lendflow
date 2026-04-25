@@ -64,9 +64,9 @@ export function LoanManagement() {
       </div>
 
       {isLoading ? <TableSkeleton /> : (
-        <div className="rounded-lg border overflow-hidden">
+        <div className="card-base overflow-hidden">
           <table className="w-full text-sm">
-            <thead className="bg-muted/50 border-b">
+            <thead className="bg-muted/30 border-b border-border">
               <tr>
                 <th className="text-left p-3 font-medium">Borrower</th>
                 <th className="text-left p-3 font-medium">Purpose</th>
@@ -108,18 +108,18 @@ export function LoanManagement() {
 
       {disburseId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="w-full max-w-sm rounded-xl bg-background p-6 space-y-4 m-4">
+          <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-card-lg space-y-4 m-4">
             <h3 className="font-bold text-lg">Disburse Loan</h3>
             <p className="text-sm text-muted-foreground">This will release funds to the borrower and start the repayment schedule.</p>
             <div className="flex gap-3">
               <button
                 onClick={() => disburse.mutate(disburseId)}
                 disabled={disburse.isPending}
-                className="flex-1 rounded-md bg-emerald-600 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+                className="flex-1 rounded-lg bg-emerald-600 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
               >
                 {disburse.isPending ? 'Processing…' : 'Confirm Disbursement'}
               </button>
-              <button onClick={() => setDisburseId(null)} className="flex-1 rounded-md border py-2 text-sm hover:bg-accent">
+              <button onClick={() => setDisburseId(null)} className="flex-1 rounded-lg border py-2 text-sm hover:bg-muted">
                 Cancel
               </button>
             </div>

@@ -56,7 +56,7 @@ export function OpportunitiesBoard() {
           <select
             value={sort}
             onChange={e => setSort(e.target.value as typeof sort)}
-            className="rounded-md border bg-background px-3 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="rounded-lg border bg-white px-3 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           >
             <option value="newest">Newest</option>
             <option value="highest_yield">Highest Yield</option>
@@ -82,7 +82,7 @@ export function OpportunitiesBoard() {
             <Link
               key={loan.id}
               to={`/lender/opportunities/${loan.id}`}
-              className="flex flex-col rounded-xl border bg-card p-5 hover:shadow-md transition-shadow"
+              className="flex flex-col card-base p-5 hover:shadow-md transition-shadow"
             >
               <div className="flex items-start justify-between mb-3">
                 <div>

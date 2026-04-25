@@ -26,115 +26,156 @@ export function RegisterPage() {
       navigate(role === 'borrower' ? '/borrower' : '/lender')
       toast.success('Account created! Welcome to LendFlow.')
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Registration failed'
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error
+        ?? (err instanceof Error ? err.message : 'Registration failed')
       toast.error(msg)
     } finally {
       setLoading(false)
     }
   }
 
-  if (step === 1) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="w-full max-w-md space-y-8 p-8">
-          <div className="text-center">
-            <h1 className="text-3xl font-bold tracking-tight">Join LendFlow</h1>
-            <p className="mt-2 text-muted-foreground">Choose your role to get started</p>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <button
-              onClick={() => { setRole('borrower'); setStep(2) }}
-              className="group flex flex-col items-center rounded-xl border-2 p-6 hover:border-primary transition-colors text-center"
-            >
-              <div className="text-3xl mb-3">📋</div>
-              <div className="font-semibold">Borrower</div>
-              <div className="text-xs text-muted-foreground mt-1">Apply for a loan, make repayments</div>
-            </button>
-            <button
-              onClick={() => { setRole('lender'); setStep(2) }}
-              className="group flex flex-col items-center rounded-xl border-2 p-6 hover:border-primary transition-colors text-center"
-            >
-              <div className="text-3xl mb-3">💼</div>
-              <div className="font-semibold">Capital Partner</div>
-              <div className="text-xs text-muted-foreground mt-1">Fund loans, earn interest income</div>
-            </button>
-          </div>
-          <p className="text-center text-sm text-muted-foreground">
-            Already have an account?{' '}
-            <Link to="/login" className="font-medium text-foreground hover:underline">Sign in</Link>
-          </p>
-        </div>
-      </div>
-    )
-  }
-
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
-      <div className="w-full max-w-md space-y-8 p-8">
-        <div className="text-center">
-          <button onClick={() => setStep(1)} className="text-sm text-muted-foreground hover:text-foreground mb-4 inline-block">
-            ← Back
-          </button>
-          <h1 className="text-3xl font-bold tracking-tight">Create your account</h1>
-          <p className="mt-2 text-muted-foreground">
-            Signing up as a <span className="font-medium capitalize">{role}</span>
-          </p>
+    <div className="min-h-screen flex bg-background">
+      {/* Left panel */}
+      <div className="hidden lg:flex lg:w-1/2 bg-primary flex-col justify-between p-12">
+        <div className="flex items-center gap-2">
+          <div className="h-8 w-8 rounded-lg bg-white/20 flex items-center justify-center">
+            <span className="text-sm font-bold text-white">L</span>
+          </div>
+          <span className="text-white font-bold text-lg">LendFlow</span>
         </div>
+        <div className="space-y-6">
+          {[
+            { icon: '🔒', title: 'Private & Vetted', desc: 'Every borrower and lender is manually reviewed before accessing the network.' },
+            { icon: '📊', title: 'Full Transparency', desc: 'AI credit assessments, amortization schedules, and yield tracking — all visible.' },
+            { icon: '⚡', title: 'Fast Origination', desc: 'Lenders can originate and fund deals directly, closing in days not months.' },
+          ].map(item => (
+            <div key={item.title} className="flex gap-4">
+              <div className="text-2xl">{item.icon}</div>
+              <div>
+                <p className="text-white font-semibold text-sm">{item.title}</p>
+                <p className="text-white/60 text-xs mt-0.5 leading-relaxed">{item.desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+        <p className="text-white/40 text-xs">LendFlow is a private lending management platform. Capital is at risk.</p>
+      </div>
 
-        {role === 'lender' && (
-          <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-            <strong>Risk Disclosure:</strong> This platform facilitates private lending. Loans can default and capital is at risk. This is not a guaranteed return product.
-          </div>
-        )}
+      {/* Right panel */}
+      <div className="flex-1 flex items-center justify-center p-8">
+        <div className="w-full max-w-sm">
+          <div className="mb-8">
+            <div className="flex items-center gap-2 mb-6 lg:hidden">
+              <div className="h-7 w-7 rounded-lg bg-primary flex items-center justify-center">
+                <span className="text-xs font-bold text-white">L</span>
+              </div>
+              <span className="font-bold">LendFlow</span>
+            </div>
 
-        <form onSubmit={handleRegister} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium mb-1.5">Full Name</label>
-            <input
-              type="text"
-              value={name}
-              onChange={e => setName(e.target.value)}
-              required
-              className="w-full rounded-md border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              placeholder="Jane Smith"
-            />
+            {step === 1 ? (
+              <>
+                <h1 className="text-2xl font-bold">Create your account</h1>
+                <p className="text-muted-foreground text-sm mt-1">Choose how you'll use LendFlow</p>
+              </>
+            ) : (
+              <>
+                <button onClick={() => setStep(1)} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-4 transition-colors">
+                  ← Back
+                </button>
+                <h1 className="text-2xl font-bold">Your details</h1>
+                <p className="text-muted-foreground text-sm mt-1">
+                  Signing up as a <span className="font-medium text-foreground capitalize">{role === 'lender' ? 'Capital Partner' : role}</span>
+                </p>
+              </>
+            )}
           </div>
-          <div>
-            <label className="block text-sm font-medium mb-1.5">Email</label>
-            <input
-              type="email"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              required
-              className="w-full rounded-md border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              placeholder="you@example.com"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1.5">Password</label>
-            <input
-              type="password"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              required
-              minLength={8}
-              className="w-full rounded-md border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              placeholder="Min 8 characters"
-            />
-          </div>
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full rounded-md bg-primary py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
-          >
-            {loading ? 'Creating account…' : 'Create account'}
-          </button>
-        </form>
 
-        <p className="text-center text-sm text-muted-foreground">
-          Already have an account?{' '}
-          <Link to="/login" className="font-medium text-foreground hover:underline">Sign in</Link>
-        </p>
+          {step === 1 && (
+            <div className="space-y-3">
+              {([
+                { role: 'borrower' as Role, label: 'Borrower', desc: 'Apply for loans, track repayments, manage your application history', icon: '📋' },
+                { role: 'lender' as Role, label: 'Capital Partner', desc: 'Fund vetted loan opportunities, earn yield, originate deals directly', icon: '💼' },
+              ]).map(opt => (
+                <button
+                  key={opt.role}
+                  onClick={() => { setRole(opt.role); setStep(2) }}
+                  className="w-full flex items-start gap-4 rounded-xl border-2 border-border bg-white p-5 hover:border-primary hover:shadow-card-md transition-all text-left group"
+                >
+                  <span className="text-2xl">{opt.icon}</span>
+                  <div>
+                    <p className="font-semibold text-sm group-hover:text-primary transition-colors">{opt.label}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{opt.desc}</p>
+                  </div>
+                </button>
+              ))}
+              <p className="text-center text-sm text-muted-foreground pt-2">
+                Already have an account?{' '}
+                <Link to="/login" className="font-medium text-primary hover:underline">Sign in</Link>
+              </p>
+            </div>
+          )}
+
+          {step === 2 && (
+            <>
+              {role === 'lender' && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 mb-4 leading-relaxed">
+                  <strong>Risk Disclosure:</strong> Private lending involves risk of capital loss. Loans can default and there is no guarantee of return.
+                </div>
+              )}
+
+              <form onSubmit={handleRegister} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1.5">Full Name</label>
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={e => setName(e.target.value)}
+                    required
+                    autoFocus
+                    className="w-full rounded-lg border bg-white px-3 py-2.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    placeholder="Jane Smith"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1.5">Email</label>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
+                    required
+                    className="w-full rounded-lg border bg-white px-3 py-2.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    placeholder="you@example.com"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1.5">Password</label>
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    required
+                    minLength={8}
+                    className="w-full rounded-lg border bg-white px-3 py-2.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    placeholder="Min. 8 characters"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full rounded-lg bg-primary py-2.5 text-sm font-semibold text-white hover:bg-primary/90 disabled:opacity-50 transition-colors shadow-sm"
+                >
+                  {loading ? 'Creating account…' : 'Create account'}
+                </button>
+              </form>
+
+              <p className="text-center text-sm text-muted-foreground mt-5">
+                Already have an account?{' '}
+                <Link to="/login" className="font-medium text-primary hover:underline">Sign in</Link>
+              </p>
+            </>
+          )}
+        </div>
       </div>
     </div>
   )
