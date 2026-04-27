@@ -231,7 +231,7 @@ export function AdminDashboard() {
                   <XAxis dataKey="month" tick={{ fontSize: 11, fill: 'hsl(220 8% 48%)' }} axisLine={false} tickLine={false} />
                   <YAxis tickFormatter={v => `$${(v / 100000).toFixed(0)}k`} tick={{ fontSize: 11, fill: 'hsl(220 8% 48%)' }} axisLine={false} tickLine={false} />
                   <Tooltip
-                    formatter={(v: number) => formatCents(v)}
+                    formatter={(v: unknown) => formatCents(v as number)}
                     contentStyle={{ borderRadius: '8px', border: '1px solid hsl(138 12% 88%)', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}
                   />
                   <Bar dataKey="volume" radius={[4, 4, 0, 0]}>

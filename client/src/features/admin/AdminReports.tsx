@@ -124,7 +124,7 @@ export function AdminReports() {
                 <XAxis dataKey="month" tick={{ fontSize: 11 }} />
                 <YAxis yAxisId="left" tickFormatter={v => `$${(v / 100000).toFixed(0)}k`} tick={{ fontSize: 11 }} />
                 <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} />
-                <Tooltip formatter={(v: number, name: string) => name === 'Volume' ? formatCents(v) : v} />
+                <Tooltip formatter={(v: unknown, name: unknown) => name === 'Volume' ? formatCents(v as number) : (v as number)} />
                 <Legend />
                 <Bar yAxisId="left" dataKey="volume" name="Volume" fill="#3b82f6" radius={[2, 2, 0, 0]} />
                 <Bar yAxisId="right" dataKey="count" name="Count" fill="#10b981" radius={[2, 2, 0, 0]} />
@@ -163,7 +163,7 @@ export function AdminReports() {
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                 <XAxis dataKey="grade" tick={{ fontSize: 12 }} />
                 <YAxis tickFormatter={v => `${v}%`} tick={{ fontSize: 11 }} />
-                <Tooltip formatter={(v: number) => `${v}%`} />
+                <Tooltip formatter={(v: unknown) => `${v}%`} />
                 <Bar dataKey="npl_rate" name="NPL Rate (%)" radius={[2, 2, 0, 0]}>
                   {npl.map(row => (
                     <Cell key={row.grade} fill={GRADE_COLORS[row.grade] ?? '#6b7280'} />
@@ -193,7 +193,7 @@ export function AdminReports() {
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                 <XAxis dataKey="month" tick={{ fontSize: 11 }} />
                 <YAxis tickFormatter={v => `$${(v / 100).toFixed(0)}`} tick={{ fontSize: 11 }} />
-                <Tooltip formatter={(v: number) => formatCents(v)} />
+                <Tooltip formatter={(v: unknown) => formatCents(v as number)} />
                 <Legend />
                 <Line type="monotone" dataKey="fees" name="Monthly Fees" stroke="#3b82f6" strokeWidth={2} dot={false} />
                 <Line type="monotone" dataKey="cumulative" name="Cumulative" stroke="#10b981" strokeWidth={2} dot={false} strokeDasharray="5 5" />

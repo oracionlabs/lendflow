@@ -184,7 +184,7 @@ export function CommitmentDetail() {
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(138 12% 91%)" vertical={false} />
               <XAxis dataKey="month" tick={{ fontSize: 11, fill: 'hsl(220 8% 48%)' }} axisLine={false} tickLine={false} />
               <YAxis tickFormatter={v => `$${(v / 100).toFixed(0)}`} tick={{ fontSize: 11, fill: 'hsl(220 8% 48%)' }} axisLine={false} tickLine={false} />
-              <Tooltip formatter={(v: number) => formatCents(v)} />
+              <Tooltip formatter={(v: unknown) => formatCents(v as number)} />
               <Bar dataKey="interest" name="Interest" fill="hsl(142 52% 38%)" radius={[3, 3, 0, 0]} stackId="a" />
               <Bar dataKey="principal" name="Principal" fill="hsl(142 52% 70%)" radius={[3, 3, 0, 0]} stackId="a" />
             </BarChart>

@@ -149,7 +149,7 @@ export function LenderReports() {
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                 <XAxis dataKey="month" tick={{ fontSize: 11 }} />
                 <YAxis tickFormatter={v => `$${(v / 100).toFixed(0)}`} tick={{ fontSize: 11 }} />
-                <Tooltip formatter={(v: number) => formatCents(v)} />
+                <Tooltip formatter={(v: unknown) => formatCents(v as number)} />
                 <Legend />
                 <Bar dataKey="amount" name="Monthly Yield" fill="#10b981" radius={[2, 2, 0, 0]} />
               </BarChart>
@@ -174,7 +174,7 @@ export function LenderReports() {
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                 <XAxis dataKey="month" tick={{ fontSize: 11 }} />
                 <YAxis tickFormatter={v => `$${(v / 100).toFixed(0)}`} tick={{ fontSize: 11 }} />
-                <Tooltip formatter={(v: number) => formatCents(v)} />
+                <Tooltip formatter={(v: unknown) => formatCents(v as number)} />
                 <Line type="monotone" dataKey="cumulative" stroke="#3b82f6" strokeWidth={2} dot={false} name="Cumulative" />
               </LineChart>
             </ResponsiveContainer>
