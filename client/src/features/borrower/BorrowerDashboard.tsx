@@ -62,13 +62,14 @@ export function BorrowerDashboard() {
       {/* CTA — Find a Lender */}
       {!isLoading && !pendingApps.length && (
         <Link to="/borrower/lenders"
-          className="flex items-center justify-between rounded-2xl border-2 border-dashed border-border p-5 hover:border-primary hover:bg-primary/5 transition-colors group">
+          className="flex items-center justify-between rounded-2xl p-5 hover:brightness-105 transition-all active:scale-[0.99]"
+          style={{ background: 'hsl(var(--lime))' }}>
           <div>
-            <p className="font-semibold group-hover:text-primary transition-colors">Find a Lender</p>
-            <p className="text-sm text-muted-foreground mt-0.5">Browse available lenders and their terms</p>
+            <p className="font-semibold text-foreground">Find a Lender</p>
+            <p className="text-sm text-foreground/70 mt-0.5">Browse available lenders and their terms</p>
           </div>
-          <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-colors">
-            <Search className="h-5 w-5 text-primary group-hover:text-white" />
+          <div className="h-10 w-10 rounded-full bg-black/10 flex items-center justify-center">
+            <Search className="h-5 w-5 text-foreground" />
           </div>
         </Link>
       )}

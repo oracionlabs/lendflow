@@ -54,6 +54,11 @@ export default {
           DEFAULT: 'hsl(var(--card))',
           foreground: 'hsl(var(--card-foreground))',
         },
+        lime: {
+          DEFAULT: 'hsl(var(--lime))',
+          foreground: 'hsl(var(--lime-foreground))',
+        },
+        sidebar: 'hsl(var(--sidebar-bg))',
       },
       borderRadius: {
         lg: 'var(--radius)',

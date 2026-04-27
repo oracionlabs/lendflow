@@ -122,17 +122,18 @@ export function PortfolioDashboard() {
       {/* Pending requests alert */}
       {pendingRequests.length > 0 && (
         <Link to="/lender/requests"
-          className="flex items-center gap-3 rounded-2xl bg-primary/10 border border-primary/20 p-4 active:scale-[0.99] transition-transform">
-          <div className="h-10 w-10 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
-            <span className="text-white font-bold text-sm">{pendingRequests.length}</span>
+          className="flex items-center gap-3 rounded-2xl p-4 active:scale-[0.99] transition-transform"
+          style={{ background: 'hsl(var(--lime))' }}>
+          <div className="h-10 w-10 rounded-full bg-black/10 flex items-center justify-center flex-shrink-0">
+            <span className="font-bold text-sm text-foreground">{pendingRequests.length}</span>
           </div>
           <div className="flex-1">
-            <p className="font-semibold text-sm text-primary">
+            <p className="font-semibold text-sm text-foreground">
               {pendingRequests.length} new request{pendingRequests.length !== 1 ? 's' : ''}
             </p>
-            <p className="text-xs text-muted-foreground">Tap to review and accept</p>
+            <p className="text-xs text-foreground/70">Tap to review and accept</p>
           </div>
-          <ChevronRight className="h-4 w-4 text-primary" />
+          <ChevronRight className="h-4 w-4 text-foreground/70" />
         </Link>
       )}
 
@@ -147,10 +148,13 @@ export function PortfolioDashboard() {
               { label: 'Yield Earned', value: formatCents(summary?.total_yield_earned ?? 0), sub: 'interest income', accent: true },
               { label: 'Projected', value: formatCents(summary?.projected_future_yield ?? 0), sub: 'remaining yield' },
             ].map(({ label, value, sub, accent }) => (
-              <div key={label} className="card-base p-4">
-                <p className="text-xs text-muted-foreground">{label}</p>
-                <p className={`text-lg font-bold mt-0.5 ${accent ? 'text-primary' : ''}`}>{value}</p>
-                <p className="text-[11px] text-muted-foreground">{sub}</p>
+              <div key={label} className="card-dark p-4">
+                <p className="text-xs text-white/50">{label}</p>
+                <p className={`text-lg font-bold mt-0.5 ${accent ? '' : 'text-white'}`}
+                  style={accent ? { color: 'hsl(var(--lime))' } : {}}>
+                  {value}
+                </p>
+                <p className="text-[11px] text-white/40">{sub}</p>
               </div>
             ))}
           </div>
@@ -190,7 +194,9 @@ export function PortfolioDashboard() {
           <TrendingUp className="h-10 w-10 text-muted-foreground mx-auto" />
           <p className="font-medium">Start lending</p>
           <p className="text-sm text-muted-foreground">Create a listing to let borrowers find you</p>
-          <Link to="/lender/listing" className="inline-block mt-2 rounded-xl bg-primary px-6 py-2.5 text-sm font-semibold text-white hover:bg-primary/90">
+          <Link to="/lender/listing"
+            className="inline-block mt-2 rounded-full px-6 py-2.5 text-sm font-semibold hover:brightness-105 transition-all"
+            style={{ background: 'hsl(var(--lime))', color: 'hsl(var(--lime-foreground))' }}>
             Create Listing
           </Link>
         </div>
