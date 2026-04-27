@@ -217,7 +217,7 @@ router.get('/portfolio/income-summary', async (req: Request, res: Response): Pro
   const byLoan: Record<string, { purpose: string; interest: number }> = {}
 
   for (const row of data ?? []) {
-    const fc = row.funding_commitments as { loan_id: string; loans?: { purpose: string } } | null
+    const fc = row.funding_commitments as unknown as { loan_id: string; loans?: { purpose: string } } | null
     const loanId = fc?.loan_id ?? ''
     const purpose = fc?.loans?.purpose ?? 'unknown'
     if (!byLoan[loanId]) byLoan[loanId] = { purpose, interest: 0 }

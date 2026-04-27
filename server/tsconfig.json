@@ -10,7 +10,6 @@
     "skipLibCheck": true,
     "resolveJsonModule": true,
     "paths": {
-      "@lendflow/shared": ["../shared/src/index.ts"],
       "@/*": ["./src/*"]
     }
   },
