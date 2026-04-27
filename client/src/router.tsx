@@ -11,6 +11,7 @@ import { AuthCallbackPage } from '@/features/auth/AuthCallbackPage'
 import { BorrowerDashboard } from '@/features/borrower/BorrowerDashboard'
 import { BrowseListings } from '@/features/borrower/BrowseListings'
 import { ListingDetail } from '@/features/borrower/ListingDetail'
+import { BorrowerLoans } from '@/features/borrower/BorrowerLoans'
 import { ActiveLoanDetail } from '@/features/borrower/ActiveLoanDetail'
 import { BorrowerProfilePage } from '@/features/borrower/BorrowerProfile'
 import { BorrowerReports } from '@/features/borrower/BorrowerReports'
@@ -18,6 +19,7 @@ import { BorrowerReports } from '@/features/borrower/BorrowerReports'
 import { PortfolioDashboard } from '@/features/lender/PortfolioDashboard'
 import { MyListing } from '@/features/lender/MyListing'
 import { LoanRequests } from '@/features/lender/LoanRequests'
+import { LenderLoans } from '@/features/lender/LenderLoans'
 import { CommitmentDetail } from '@/features/lender/CommitmentDetail'
 import { LoanOrigination } from '@/features/lender/LoanOrigination'
 import { LenderProfilePage } from '@/features/lender/LenderProfilePage'
@@ -46,7 +48,7 @@ export const router = createBrowserRouter([
         { path: '/borrower', element: <BorrowerDashboard /> },
         { path: '/borrower/lenders', element: <BrowseListings /> },
         { path: '/borrower/lenders/:id', element: <ListingDetail /> },
-        { path: '/borrower/loans', element: <BorrowerDashboard /> },
+        { path: '/borrower/loans', element: <BorrowerLoans /> },
         { path: '/borrower/loans/:id', element: <ActiveLoanDetail /> },
         { path: '/borrower/reports', element: <BorrowerReports /> },
         { path: '/borrower/profile', element: <BorrowerProfilePage /> },
@@ -62,7 +64,7 @@ export const router = createBrowserRouter([
         { path: '/lender', element: <PortfolioDashboard /> },
         { path: '/lender/listing', element: <MyListing /> },
         { path: '/lender/requests', element: <LoanRequests /> },
-        { path: '/lender/loans', element: <PortfolioDashboard /> },
+        { path: '/lender/loans', element: <LenderLoans /> },
         { path: '/lender/commitments/:id', element: <CommitmentDetail /> },
         { path: '/lender/new-loan', element: <LoanOrigination /> },
         { path: '/lender/reports', element: <LenderReports /> },

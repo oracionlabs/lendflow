@@ -229,7 +229,7 @@ export function LoanOrigination() {
   }
 
   return (
-    <div className="max-w-xl space-y-6">
+    <div className="max-w-xl mx-auto space-y-6">
       {/* Step indicator */}
       <div className="flex items-center gap-0">
         {STEPS.map((label, i) => {

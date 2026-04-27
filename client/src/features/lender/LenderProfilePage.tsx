@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
 import api from '@/lib/api'
 import { useAuth } from '@/context/AuthContext'
 import { formatDate } from '@/lib/utils'
 import { CardSkeleton } from '@/components/shared/LoadingSkeleton'
 import type { LenderProfile } from '@lendflow/shared'
+import { BarChart2, FileText, ChevronRight } from 'lucide-react'
 
 type LenderType = 'individual' | 'institutional'
 type RiskTolerance = 'conservative' | 'moderate' | 'aggressive'
@@ -161,6 +163,26 @@ export function LenderProfilePage() {
           </button>
         </div>
       </section>
+
+      {/* Quick links */}
+      <div className="space-y-2">
+        <Link to="/lender/listing"
+          className="flex items-center justify-between card-base p-4 hover:bg-muted/30 transition-colors">
+          <div className="flex items-center gap-3">
+            <FileText className="h-5 w-5 text-primary" />
+            <span className="font-medium text-sm">My Listing</span>
+          </div>
+          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+        </Link>
+        <Link to="/lender/reports"
+          className="flex items-center justify-between card-base p-4 hover:bg-muted/30 transition-colors">
+          <div className="flex items-center gap-3">
+            <BarChart2 className="h-5 w-5 text-primary" />
+            <span className="font-medium text-sm">Reports & Analytics</span>
+          </div>
+          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+        </Link>
+      </div>
 
       {/* Document status */}
       <section className="card-base p-6 space-y-4">

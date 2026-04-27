@@ -1,11 +1,13 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import api from '@/lib/api'
 import { useAuth } from '@/context/AuthContext'
 import { toast } from 'sonner'
 import type { BorrowerProfile } from '@lendflow/shared'
 import { formatCents } from '@/lib/utils'
 import { LoadingSkeleton } from '@/components/shared/LoadingSkeleton'
+import { BarChart2, ChevronRight } from 'lucide-react'
 
 export function BorrowerProfilePage() {
   const { user } = useAuth()
@@ -194,6 +196,15 @@ export function BorrowerProfilePage() {
           ))}
         </div>
       )}
+
+      <Link to="/borrower/reports"
+        className="flex items-center justify-between card-base p-4 hover:bg-muted/30 transition-colors">
+        <div className="flex items-center gap-3">
+          <BarChart2 className="h-5 w-5 text-primary" />
+          <span className="font-medium text-sm">Reports & Analytics</span>
+        </div>
+        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+      </Link>
     </div>
   )
 }
