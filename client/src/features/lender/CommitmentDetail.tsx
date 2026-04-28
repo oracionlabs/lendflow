@@ -1,11 +1,23 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, Link } from 'react-router-dom'
+import { useState } from 'react'
 import api from '@/lib/api'
+import { toast } from 'sonner'
 import { formatCents, formatDate, formatPercent } from '@/lib/utils'
 import { CreditGradeBadge } from '@/components/shared/CreditGradeBadge'
 import { CardSkeleton, TableSkeleton } from '@/components/shared/LoadingSkeleton'
 import { LOAN_PURPOSE_LABELS } from '@lendflow/shared'
-import { ArrowLeft, TrendingUp } from 'lucide-react'
+import { ArrowLeft, TrendingUp, XCircle } from 'lucide-react'
+
+const CANCEL_REASONS = [
+  'Borrower requested cancellation',
+  'Unable to verify borrower',
+  'Terms no longer suitable',
+  'Funds no longer available',
+  'Other',
+]
+
+const TERMINAL = ['completed', 'cancelled', 'rejected', 'defaulted']
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 
 interface CommitmentDetail {
@@ -45,6 +57,10 @@ interface YieldDistribution {
 
 export function CommitmentDetail() {
   const { id } = useParams<{ id: string }>()
+  const qc = useQueryClient()
+  const [showCancel, setShowCancel] = useState(false)
+  const [cancelReason, setCancelReason] = useState(CANCEL_REASONS[0])
+  const [cancelOther, setCancelOther] = useState('')
 
   const { data: commitment, isLoading } = useQuery({
     queryKey: ['commitment', id],
@@ -61,6 +77,22 @@ export function CommitmentDetail() {
       return data.yields
     },
     enabled: !!commitment,
+  })
+
+  const cancelMutation = useMutation({
+    mutationFn: async () => {
+      const reason = cancelReason === 'Other' ? cancelOther.trim() : cancelReason
+      await api.post(`/api/lender/commitments/${id}/cancel`, { reason })
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['commitment', id] })
+      qc.invalidateQueries({ queryKey: ['lender-commitments'] })
+      setShowCancel(false)
+      toast.success('Loan cancelled')
+    },
+    onError: (err: unknown) => {
+      toast.error((err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Failed to cancel')
+    },
   })
 
   if (isLoading) return (
@@ -109,11 +141,59 @@ export function CommitmentDetail() {
               Funded {formatDate(commitment.funded_at)} · {loan.term_months}mo term · {formatPercent(loan.interest_rate)}
             </p>
           </div>
-          <div className="text-right">
+          <div className="text-right space-y-2">
             <p className="text-2xl font-bold">{formatCents(commitment.amount)}</p>
             <p className="text-sm text-muted-foreground">{commitment.share_percent.toFixed(2)}% share</p>
+            {!TERMINAL.includes(loan.status) && !showCancel && (
+              <button
+                onClick={() => setShowCancel(true)}
+                className="flex items-center gap-1.5 rounded-lg border border-destructive/40 px-3 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/5 transition-colors ml-auto"
+              >
+                <XCircle className="h-3.5 w-3.5" /> Cancel Loan
+              </button>
+            )}
           </div>
         </div>
+
+        {showCancel && (
+          <div className="mt-5 rounded-xl border border-destructive/30 bg-destructive/5 p-4 space-y-3">
+            <div>
+              <p className="font-semibold text-destructive text-sm">Cancel this loan</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Please provide a reason for cancellation.</p>
+            </div>
+            <select
+              value={cancelReason}
+              onChange={e => setCancelReason(e.target.value)}
+              className="w-full rounded-lg border bg-background px-3 py-2.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive"
+            >
+              {CANCEL_REASONS.map(r => <option key={r} value={r}>{r}</option>)}
+            </select>
+            {cancelReason === 'Other' && (
+              <textarea
+                value={cancelOther}
+                onChange={e => setCancelOther(e.target.value)}
+                rows={2}
+                placeholder="Please describe your reason…"
+                className="w-full rounded-lg border bg-background px-3 py-2.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive resize-none"
+              />
+            )}
+            <div className="flex gap-2">
+              <button
+                onClick={() => cancelMutation.mutate()}
+                disabled={cancelMutation.isPending || (cancelReason === 'Other' && !cancelOther.trim())}
+                className="rounded-lg bg-destructive px-4 py-2 text-sm font-semibold text-white hover:bg-destructive/90 disabled:opacity-50 transition-colors"
+              >
+                {cancelMutation.isPending ? 'Cancelling…' : 'Confirm Cancellation'}
+              </button>
+              <button
+                onClick={() => { setShowCancel(false); setCancelReason(CANCEL_REASONS[0]); setCancelOther('') }}
+                className="rounded-lg border px-4 py-2 text-sm font-medium hover:bg-muted transition-colors"
+              >
+                Keep Loan
+              </button>
+            </div>
+          </div>
+        )}
 
         <div className="mt-5 grid grid-cols-4 gap-4">
           {[

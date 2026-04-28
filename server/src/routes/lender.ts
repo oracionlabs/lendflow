@@ -482,4 +482,41 @@ router.post('/loans/new', async (req: Request, res: Response): Promise<void> => 
   res.status(201).json({ loan })
 })
 
+router.post('/commitments/:id/cancel', async (req: Request, res: Response): Promise<void> => {
+  const lender = res.locals.user
+  const { reason } = req.body as { reason?: string }
+  const db = supabaseAdmin()
+
+  const { data: commitment } = await db
+    .from('funding_commitments')
+    .select('loan_id, status')
+    .eq('id', req.params.id)
+    .eq('lender_id', lender.id)
+    .single()
+
+  if (!commitment) { res.status(404).json({ error: 'Commitment not found' }); return }
+
+  const { data: loan } = await db
+    .from('loans')
+    .select('status')
+    .eq('id', commitment.loan_id)
+    .single()
+
+  if (!loan) { res.status(404).json({ error: 'Loan not found' }); return }
+
+  const terminal = ['completed', 'cancelled', 'rejected', 'defaulted']
+  if (terminal.includes(loan.status)) {
+    res.status(400).json({ error: 'This loan can no longer be cancelled' }); return
+  }
+
+  await db.from('loans').update({
+    status: 'cancelled',
+    rejection_reason: reason ?? null,
+  }).eq('id', commitment.loan_id)
+
+  await db.from('funding_commitments').update({ status: 'completed' }).eq('id', req.params.id)
+
+  res.json({ success: true })
+})
+
 export default router
