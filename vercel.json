@@ -2,6 +2,6 @@
   "framework": null,
   "installCommand": "pnpm install",
   "buildCommand": "REPO=$(git rev-parse --show-toplevel) && (cd $REPO/shared && pnpm run build) && (cd $REPO/client && pnpm run build)",
-  "outputDirectory": "client/dist",
+  "outputDirectory": "dist",
   "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
 }
