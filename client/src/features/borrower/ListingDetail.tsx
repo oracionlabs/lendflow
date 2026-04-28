@@ -12,7 +12,9 @@ import {
   type LoanPackage,
 } from '@lendflow/shared'
 import { CardSkeleton } from '@/components/shared/LoadingSkeleton'
+import { DatePicker } from '@/components/shared/DatePicker'
 import { ArrowLeft, CheckCircle2, Check } from 'lucide-react'
+import { format, addDays } from 'date-fns'
 
 interface Listing {
   id: string
@@ -33,6 +35,9 @@ export function ListingDetail() {
   const navigate = useNavigate()
   const [applied, setApplied] = useState(false)
   const [selectedPackageId, setSelectedPackageId] = useState<string | null>(null)
+  const [dueDateMode, setDueDateMode] = useState<'days' | 'date'>('days')
+  const [lumpSumDays, setLumpSumDays] = useState(30)
+  const [lumpSumDate, setLumpSumDate] = useState('')
   const [form, setForm] = useState({
     amount_requested: 0,
     purpose: 'personal',
@@ -51,12 +56,24 @@ export function ListingDetail() {
 
   const selectedPkg = listing?.listing_packages?.find(p => p.id === selectedPackageId) ?? null
 
+  // When lump_sum with no fixed term, compute due_date from days or date picker
+  const isLumpSum = selectedPkg?.repayment_type === 'lump_sum' && !selectedPkg.term_months
+  const isNoPackageFlat = !selectedPkg && listing?.rate_period === 'flat'
+  const showDueDateInput = isLumpSum || isNoPackageFlat
+
+  const computedDueDate = showDueDateInput
+    ? dueDateMode === 'days'
+      ? format(addDays(new Date(), lumpSumDays), 'yyyy-MM-dd')
+      : lumpSumDate
+    : null
+
   const apply = useMutation({
     mutationFn: async () => {
       const { data } = await api.post(`/api/listings/${id}/apply`, {
         ...form,
         term_months: selectedPkg?.term_months ?? form.term_months,
         package_id: selectedPackageId ?? undefined,
+        due_date: computedDueDate ?? undefined,
       })
       return data
     },
@@ -102,11 +119,17 @@ export function ListingDetail() {
   const purposes = listing.accepted_purposes?.length ? listing.accepted_purposes : Object.keys(LOAN_PURPOSE_LABELS)
   const amountDollars = form.amount_requested / 100
 
+  const dueDateValid = !showDueDateInput ||
+    (dueDateMode === 'days' ? lumpSumDays > 0 : !!lumpSumDate)
+
   const isValid =
     form.amount_requested >= effectiveMinLoan &&
     (!effectiveMaxLoan || form.amount_requested <= effectiveMaxLoan) &&
     (!hasPackages || !!selectedPackageId) &&
-    (selectedPkg?.repayment_type === 'daily_interest' || form.term_months > 0)
+    dueDateValid &&
+    (selectedPkg?.repayment_type === 'daily_interest' || showDueDateInput || form.term_months > 0)
+
+  const tomorrow = format(addDays(new Date(), 1), 'yyyy-MM-dd')
 
   return (
     <div className="max-w-lg mx-auto space-y-4">
@@ -225,8 +248,56 @@ export function ListingDetail() {
           </select>
         </div>
 
-        {/* Term selector — hidden when package has a fixed term or is daily_interest */}
-        {!selectedPkg || (!selectedPkg.term_months && selectedPkg.repayment_type !== 'daily_interest') ? (
+        {/* Due date input for lump_sum / flat rate */}
+        {showDueDateInput ? (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="block text-sm font-medium">When will you repay?</label>
+              <div className="flex rounded-lg border overflow-hidden text-xs font-medium">
+                <button type="button" onClick={() => setDueDateMode('days')}
+                  className={`px-3 py-1.5 transition-colors ${dueDateMode === 'days' ? 'bg-primary text-white' : 'hover:bg-muted text-muted-foreground'}`}>
+                  Days
+                </button>
+                <button type="button" onClick={() => setDueDateMode('date')}
+                  className={`px-3 py-1.5 border-l transition-colors ${dueDateMode === 'date' ? 'bg-primary text-white' : 'hover:bg-muted text-muted-foreground'}`}>
+                  Date
+                </button>
+              </div>
+            </div>
+            {dueDateMode === 'days' ? (
+              <>
+                <div className="relative">
+                  <input type="number" value={lumpSumDays || ''} min={1}
+                    onChange={e => setLumpSumDays(parseInt(e.target.value || '1'))}
+                    placeholder="30"
+                    className="w-full rounded-xl border bg-background px-3 py-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" />
+                  <span className="absolute right-3 top-3 text-xs text-muted-foreground">days</span>
+                </div>
+                {lumpSumDays > 0 && (
+                  <p className="text-xs text-muted-foreground">Due on <span className="font-medium text-foreground">{computedDueDate}</span></p>
+                )}
+              </>
+            ) : (
+              <>
+                <DatePicker value={lumpSumDate} onChange={setLumpSumDate} min={tomorrow} placeholder="Select repayment date" />
+                {lumpSumDate && (
+                  <p className="text-xs text-muted-foreground">
+                    {Math.round((new Date(lumpSumDate).getTime() - Date.now()) / 86400000)} days from today
+                  </p>
+                )}
+              </>
+            )}
+          </div>
+        ) : selectedPkg?.repayment_type === 'daily_interest' ? (
+          <div className="rounded-xl bg-muted/40 px-4 py-3 text-sm">
+            <p className="font-medium">Flexible repayment</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Repay anytime within {selectedPkg.max_term_days} days — interest accrues daily</p>
+          </div>
+        ) : selectedPkg?.term_months ? (
+          <div className="rounded-xl bg-muted/40 px-4 py-3 text-sm">
+            <p className="text-muted-foreground">Term: <span className="font-semibold text-foreground">{selectedPkg.term_months} months</span></p>
+          </div>
+        ) : (
           <div>
             <label className="block text-sm font-medium mb-2">How long do you need?</label>
             <div className="flex flex-wrap gap-2">
@@ -239,15 +310,6 @@ export function ListingDetail() {
                 </button>
               ))}
             </div>
-          </div>
-        ) : selectedPkg.repayment_type === 'daily_interest' ? (
-          <div className="rounded-xl bg-muted/40 px-4 py-3 text-sm">
-            <p className="font-medium">Flexible repayment</p>
-            <p className="text-xs text-muted-foreground mt-0.5">Repay anytime within {selectedPkg.max_term_days} days — interest accrues daily</p>
-          </div>
-        ) : (
-          <div className="rounded-xl bg-muted/40 px-4 py-3 text-sm">
-            <p className="text-muted-foreground">Term: <span className="font-semibold text-foreground">{selectedPkg.term_months} months</span></p>
           </div>
         )}
 
