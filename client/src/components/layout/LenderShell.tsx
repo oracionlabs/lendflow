@@ -3,6 +3,7 @@ import { useAuth } from '@/context/AuthContext'
 import { NotificationBell } from './NotificationBell'
 import { Home, FileText, Users, User, LogOut, Plus } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { ThemeToggle } from '@/components/shared/ThemeToggle'
 
 const navItems = [
   { to: '/lender', label: 'Home', icon: Home, end: true },
@@ -62,7 +63,7 @@ export function LenderShell() {
 
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header */}
-        <header className="bg-white border-b border-border flex items-center justify-between px-4 py-3 md:px-6 md:h-14 shadow-sm sticky top-0 z-30">
+        <header className="bg-background border-b border-border flex items-center justify-between px-4 py-3 md:px-6 md:h-14 shadow-sm sticky top-0 z-30">
           <div className="flex items-center gap-2 md:hidden">
             <div className="h-6 w-6 rounded-lg bg-primary flex items-center justify-center">
               <span className="text-[10px] font-bold text-white">L</span>
@@ -80,6 +81,7 @@ export function LenderShell() {
               <Plus className="h-4 w-4" />
               <span className="hidden sm:inline">New Loan</span>
             </Link>
+            <ThemeToggle />
             <NotificationBell />
             <div className="flex items-center gap-1.5 rounded-full border border-border bg-muted/50 px-2.5 py-1.5">
               <div className="h-4 w-4 rounded-full bg-primary/15 flex items-center justify-center">
@@ -95,7 +97,7 @@ export function LenderShell() {
         </main>
 
         {/* Mobile bottom nav */}
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-border z-40">
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-background border-t border-border z-40">
           <div className="flex">
             {navItems.map(({ to, label, icon: Icon, end }) => (
               <NavLink key={to} to={to} end={end}
