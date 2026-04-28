@@ -18,7 +18,7 @@ router.put('/', async (req: Request, res: Response): Promise<void> => {
     'origination_fee_percent', 'late_fee_flat', 'late_fee_daily_percent',
     'grace_period_days', 'default_threshold_missed',
     'min_loan_amount', 'max_loan_amount', 'min_commitment_amount',
-    'supported_terms', 'credit_grade_rates',
+    'supported_terms', 'credit_grade_rates', 'currency',
   ]
 
   const updates = Object.fromEntries(

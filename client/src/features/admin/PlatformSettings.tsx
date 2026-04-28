@@ -56,6 +56,37 @@ export function PlatformSettings() {
       {editing ? (
         <form onSubmit={e => { e.preventDefault(); save.mutate(form) }} className="space-y-6">
           <section className="space-y-4">
+            <h2 className="font-semibold">Currency</h2>
+            <div>
+              <label className="block text-sm font-medium mb-1.5">Platform Currency</label>
+              <select value={(form as Record<string, unknown>).currency as string ?? 'USD'}
+                onChange={e => setForm(f => ({ ...f, currency: e.target.value }))}
+                className="w-full rounded-md border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                {[
+                  ['USD', 'USD — US Dollar ($)'],
+                  ['EUR', 'EUR — Euro (€)'],
+                  ['GBP', 'GBP — British Pound (£)'],
+                  ['AUD', 'AUD — Australian Dollar (A$)'],
+                  ['CAD', 'CAD — Canadian Dollar (C$)'],
+                  ['ZAR', 'ZAR — South African Rand (R)'],
+                  ['NGN', 'NGN — Nigerian Naira (₦)'],
+                  ['GHS', 'GHS — Ghanaian Cedi (₵)'],
+                  ['KES', 'KES — Kenyan Shilling (KSh)'],
+                  ['JPY', 'JPY — Japanese Yen (¥)'],
+                  ['INR', 'INR — Indian Rupee (₹)'],
+                  ['BRL', 'BRL — Brazilian Real (R$)'],
+                  ['MXN', 'MXN — Mexican Peso (MX$)'],
+                  ['SGD', 'SGD — Singapore Dollar (S$)'],
+                  ['AED', 'AED — UAE Dirham (د.إ)'],
+                ].map(([code, label]) => (
+                  <option key={code} value={code}>{label}</option>
+                ))}
+              </select>
+              <p className="text-xs text-muted-foreground mt-1">Affects how amounts are displayed across the entire platform.</p>
+            </div>
+          </section>
+
+          <section className="space-y-4">
             <h2 className="font-semibold">Fees</h2>
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -142,6 +173,13 @@ export function PlatformSettings() {
         </form>
       ) : (
         <div className="space-y-6 text-sm">
+          <section className="space-y-3">
+            <h2 className="font-semibold">Currency</h2>
+            <div className="flex gap-4 py-2">
+              <span className="w-48 text-muted-foreground">Platform Currency</span>
+              <span className="font-medium">{(settings as Record<string, unknown> | undefined)?.currency as string ?? 'USD'}</span>
+            </div>
+          </section>
           <section className="space-y-3">
             <h2 className="font-semibold">Fees & Rules</h2>
             {[

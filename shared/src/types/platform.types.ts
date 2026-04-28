@@ -10,5 +10,6 @@ export interface PlatformSettings {
   min_commitment_amount: number
   supported_terms: number[]
   credit_grade_rates: Record<string, number>
+  currency: string
   updated_at: string
 }

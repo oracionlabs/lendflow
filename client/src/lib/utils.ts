@@ -5,12 +5,17 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-const currencyFmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' })
-const percentFmt = new Intl.NumberFormat('en-US', { style: 'percent', minimumFractionDigits: 2, maximumFractionDigits: 2 })
+let _currency = 'USD'
+
+export function setCurrency(currency: string) {
+  _currency = currency
+}
 
 export function formatCents(cents: number): string {
-  return currencyFmt.format(cents / 100)
+  return new Intl.NumberFormat(undefined, { style: 'currency', currency: _currency }).format(cents / 100)
 }
+
+const percentFmt = new Intl.NumberFormat('en-US', { style: 'percent', minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
 export function formatPercent(decimal: number): string {
   return percentFmt.format(decimal)
