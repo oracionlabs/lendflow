@@ -22,3 +22,12 @@ services:
         sync: false
       - key: ANTHROPIC_API_KEY
         sync: false
+
+  - type: cron
+    name: lendflow-keepalive
+    runtime: node
+    region: oregon
+    plan: free
+    schedule: "*/10 * * * *"
+    buildCommand: echo "keepalive"
+    startCommand: curl -s https://lendflow-api.onrender.com/health
