@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: lendflow-api
+    runtime: node
+    region: oregon
+    plan: free
+    buildCommand: pnpm install && pnpm --filter @lendflow/shared build && pnpm --filter server build
+    startCommand: node server/dist/index.js
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3001
+      - key: DATABASE_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
