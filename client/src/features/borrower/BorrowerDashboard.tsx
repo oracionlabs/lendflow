@@ -20,8 +20,8 @@ export function BorrowerDashboard() {
     },
   })
 
-  const activeLoans = loans?.filter(l => ['active', 'repaying'].includes(l.status)) ?? []
-  const pendingApps = loans?.filter(l => ['submitted', 'under_review', 'approved', 'funding', 'fully_funded'].includes(l.status)) ?? []
+  const activeLoans = loans?.filter(l => ['active', 'repaying', 'approved', 'funding', 'fully_funded'].includes(l.status)) ?? []
+  const pendingApps = loans?.filter(l => ['submitted', 'under_review'].includes(l.status)) ?? []
   const pastLoans = loans?.filter(l => ['completed', 'rejected', 'cancelled', 'defaulted'].includes(l.status)) ?? []
 
   const nextPayment = activeLoans

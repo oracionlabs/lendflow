@@ -32,8 +32,9 @@ export function LenderLoans() {
     </div>
   )
 
-  const active = commitments?.filter(c => ['active', 'performing'].includes(c.status)) ?? []
-  const other = commitments?.filter(c => !['active', 'performing'].includes(c.status)) ?? []
+  const ACTIVE = ['active', 'performing', 'repaying']
+  const active = commitments?.filter(c => ACTIVE.includes(c.status) || ['active', 'repaying', 'approved', 'funding', 'fully_funded'].includes((c.loans as { status?: string })?.status ?? '')) ?? []
+  const other = commitments?.filter(c => !active.includes(c)) ?? []
 
   function CommitmentCard({ c }: { c: CommitmentWithLoan }) {
     const loan = c.loans

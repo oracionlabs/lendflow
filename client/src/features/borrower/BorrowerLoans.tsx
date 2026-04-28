@@ -8,8 +8,8 @@ import { LOAN_PURPOSE_LABELS } from '@lendflow/shared'
 import type { Loan } from '@lendflow/shared'
 import { ChevronRight, FileText } from 'lucide-react'
 
-const ACTIVE_STATUSES = ['active', 'repaying']
-const PENDING_STATUSES = ['submitted', 'under_review', 'approved', 'funding', 'fully_funded']
+const ACTIVE_STATUSES = ['active', 'repaying', 'approved', 'funding', 'fully_funded']
+const PENDING_STATUSES = ['submitted', 'under_review']
 const PAST_STATUSES = ['completed', 'rejected', 'cancelled', 'defaulted']
 
 function LoanCard({ loan }: { loan: Loan }) {
@@ -79,7 +79,7 @@ export function BorrowerLoans() {
       ) : (
         <>
           <Section title="Active" loans={active} />
-          <Section title="Pending" loans={pending} />
+          <Section title="Applications" loans={pending} />
           <Section title="Past" loans={past} />
         </>
       )}
