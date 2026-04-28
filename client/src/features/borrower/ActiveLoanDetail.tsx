@@ -19,7 +19,7 @@ const CANCEL_REASONS = [
   'Other',
 ]
 
-const CANCELLABLE = ['draft', 'submitted', 'under_review', 'approved']
+const CANCELLABLE = ['draft', 'submitted', 'under_review', 'approved', 'funding', 'fully_funded', 'active', 'repaying']
 
 function ScheduleStatusIcon({ status }: { status: string }) {
   if (status === 'paid') return <CheckCircle className="h-4 w-4 text-green-600" />

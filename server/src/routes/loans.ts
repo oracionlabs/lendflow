@@ -307,7 +307,7 @@ router.post('/:id/cancel', requireBorrower, async (req: Request, res: Response):
     res.status(404).json({ error: 'Loan not found' }); return
   }
 
-  const cancellable = ['draft', 'submitted', 'under_review', 'approved']
+  const cancellable = ['draft', 'submitted', 'under_review', 'approved', 'funding', 'fully_funded', 'active', 'repaying']
   if (!cancellable.includes(loan.status)) {
     res.status(400).json({ error: 'This loan can no longer be cancelled' }); return
   }
