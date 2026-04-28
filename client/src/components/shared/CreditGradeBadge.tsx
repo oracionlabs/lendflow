@@ -15,7 +15,7 @@ interface Props {
 }
 
 export function CreditGradeBadge({ grade, className }: Props) {
-  if (!grade) return <span className="text-muted-foreground text-xs">Pending</span>
+  if (!grade) return null
   const g = grade as CreditGrade
   return (
     <span className={cn(
