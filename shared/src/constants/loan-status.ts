@@ -31,6 +31,7 @@ export const CURRENCIES: { code: string; label: string }[] = [
   { code: 'MXN', label: 'MXN — Mexican Peso (MX$)' },
   { code: 'SGD', label: 'SGD — Singapore Dollar (S$)' },
   { code: 'AED', label: 'AED — UAE Dirham (د.إ)' },
+  { code: 'PHP', label: 'PHP — Philippine Peso (₱)' },
 ]
 
 export const LOAN_PURPOSE_LABELS: Record<string, string> = {
