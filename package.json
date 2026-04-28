@@ -8,6 +8,8 @@
     "supabase:start": "npx supabase start --workdir supabase",
     "supabase:stop": "npx supabase stop --workdir supabase",
     "db:migrate": "pnpm --filter server db:migrate",
+    "db:migrate:prod": "pnpm --filter server db:migrate:prod",
+    "seed:prod": "pnpm --filter server seed:prod",
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck"
   },
