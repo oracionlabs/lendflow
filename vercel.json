@@ -1,7 +1,7 @@
 {
   "framework": null,
-  "buildCommand": "pnpm --filter @lendflow/shared build && pnpm --filter @lendflow/client build",
-  "outputDirectory": "dist",
   "installCommand": "pnpm install",
+  "buildCommand": "(cd shared && pnpm run build) && (cd client && pnpm run build)",
+  "outputDirectory": "client/dist",
   "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
 }
