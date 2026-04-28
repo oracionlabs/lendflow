@@ -70,7 +70,7 @@ export function LenderProfilePage() {
       </div>
 
       {/* Account info */}
-      <section className="card-base p-6 space-y-4">
+      <section className="card-base p-4 md:p-6 space-y-4">
         <h2 className="font-semibold">Account Information</h2>
         <div className="grid grid-cols-2 gap-4 text-sm">
           <div>
@@ -104,26 +104,32 @@ export function LenderProfilePage() {
       </section>
 
       {/* Lending preferences */}
-      <section className="card-base p-6 space-y-5">
+      <section className="card-base p-4 md:p-6 space-y-5">
         <h2 className="font-semibold">Lending Preferences</h2>
 
         <div>
           <label className="block text-sm font-medium mb-2">Lender Type</label>
-          <div className="grid grid-cols-2 gap-3">
-            {(['individual', 'institutional'] as LenderType[]).map(type => (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {([
+              { value: 'individual', label: 'Individual', desc: 'Personal lending from your own funds' },
+              { value: 'institutional', label: 'Institutional', desc: 'Lending on behalf of an organization or fund' },
+            ] as { value: LenderType; label: string; desc: string }[]).map(opt => (
               <button
-                key={type}
-                onClick={() => setLenderType(type === currentType ? '' : type)}
-                className={`rounded-lg border p-4 text-left transition-colors ${
-                  currentType === type
-                    ? 'border-primary bg-primary/5'
-                    : 'hover:border-muted-foreground/30'
+                key={opt.value}
+                onClick={() => setLenderType(opt.value === currentType ? '' : opt.value)}
+                className={`flex items-start gap-3 rounded-xl border p-3 text-left transition-colors ${
+                  currentType === opt.value ? 'border-primary bg-primary/5' : 'hover:bg-muted/40'
                 }`}
               >
-                <p className="font-medium capitalize">{type}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {type === 'individual' ? 'Personal lending from your own funds' : 'Lending on behalf of an organization or fund'}
-                </p>
+                <div className={`mt-0.5 h-4 w-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${
+                  currentType === opt.value ? 'border-primary' : 'border-muted-foreground/40'
+                }`}>
+                  {currentType === opt.value && <div className="h-2 w-2 rounded-full bg-primary" />}
+                </div>
+                <div>
+                  <p className="text-sm font-medium">{opt.label}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{opt.desc}</p>
+                </div>
               </button>
             ))}
           </div>
@@ -131,37 +137,40 @@ export function LenderProfilePage() {
 
         <div>
           <label className="block text-sm font-medium mb-2">Risk Tolerance</label>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             {([
               { value: 'conservative', label: 'Conservative', desc: 'Grade A–B only, lower yield' },
-              { value: 'moderate', label: 'Moderate', desc: 'Grade A–C, balanced approach' },
-              { value: 'aggressive', label: 'Aggressive', desc: 'All grades, higher yield potential' },
+              { value: 'moderate', label: 'Moderate', desc: 'Grade A–C, balanced' },
+              { value: 'aggressive', label: 'Aggressive', desc: 'All grades, higher yield' },
             ] as { value: RiskTolerance; label: string; desc: string }[]).map(opt => (
               <button
                 key={opt.value}
                 onClick={() => setRiskTolerance(opt.value === currentTolerance ? '' : opt.value)}
-                className={`rounded-lg border p-4 text-left transition-colors ${
-                  currentTolerance === opt.value
-                    ? 'border-primary bg-primary/5'
-                    : 'hover:border-muted-foreground/30'
+                className={`flex items-start gap-3 rounded-xl border p-3 text-left transition-colors ${
+                  currentTolerance === opt.value ? 'border-primary bg-primary/5' : 'hover:bg-muted/40'
                 }`}
               >
-                <p className="font-medium">{opt.label}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">{opt.desc}</p>
+                <div className={`mt-0.5 h-4 w-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${
+                  currentTolerance === opt.value ? 'border-primary' : 'border-muted-foreground/40'
+                }`}>
+                  {currentTolerance === opt.value && <div className="h-2 w-2 rounded-full bg-primary" />}
+                </div>
+                <div>
+                  <p className="text-sm font-medium">{opt.label}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{opt.desc}</p>
+                </div>
               </button>
             ))}
           </div>
         </div>
 
-        <div className="flex justify-end pt-2">
-          <button
-            onClick={handleSave}
-            disabled={!isDirty || updateMutation.isPending}
-            className="rounded-md bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {updateMutation.isPending ? 'Saving...' : 'Save Changes'}
-          </button>
-        </div>
+        <button
+          onClick={handleSave}
+          disabled={!isDirty || updateMutation.isPending}
+          className="w-full rounded-xl bg-primary py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          {updateMutation.isPending ? 'Saving...' : 'Save Changes'}
+        </button>
       </section>
 
       {/* Quick links */}
@@ -185,7 +194,7 @@ export function LenderProfilePage() {
       </div>
 
       {/* Document status */}
-      <section className="card-base p-6 space-y-4">
+      <section className="card-base p-4 md:p-6 space-y-4">
         <h2 className="font-semibold">Document Verification</h2>
         <p className="text-sm text-muted-foreground">
           Document uploads are reviewed by our team within 1–2 business days.
