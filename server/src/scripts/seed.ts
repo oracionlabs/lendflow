@@ -59,6 +59,16 @@ async function createListing(lenderId: string, opts: {
   acceptedPurposes: string[]
   maxTermMonths: number | null
   description: string
+  packages?: Array<{
+    name: string
+    repayment_type: string
+    interest_rate: number
+    rate_period: string
+    term_months?: number
+    max_term_days?: number
+    payment_frequency?: string
+    description?: string
+  }>
 }) {
   const { data, error } = await db.from('lender_listings').insert({
     lender_id: lenderId,
@@ -73,6 +83,14 @@ async function createListing(lenderId: string, opts: {
     status: 'active',
   }).select().single()
   if (error || !data) throw new Error(`Listing create failed: ${error?.message}`)
+
+  if (opts.packages?.length) {
+    const { error: pkgErr } = await db.from('listing_packages').insert(
+      opts.packages.map((p, i) => ({ listing_id: data.id, sort_order: i, ...p }))
+    )
+    if (pkgErr) console.warn(`Packages insert warning: ${pkgErr.message}`)
+  }
+
   return data
 }
 
@@ -91,6 +109,7 @@ async function createPendingRequest(borrowerId: string, listingId: string, opts:
     purpose: opts.purpose,
     purpose_description: opts.description ?? null,
     term_months: opts.termMonths,
+    repayment_type: 'installments',
     amount_funded: 0,
     funding_percent: 0,
     lender_count: 0,
@@ -110,6 +129,7 @@ async function createRejectedLoan(borrowerId: string, lenderId: string, listingI
     amount_requested: opts.amount,
     purpose: opts.purpose,
     term_months: opts.termMonths,
+    repayment_type: 'installments',
     amount_funded: 0,
     funding_percent: 0,
     lender_count: 0,
@@ -159,6 +179,7 @@ async function createActiveLoan(opts: {
     total_repayment: amort.total_repayment,
     origination_fee: 0,
     origination_fee_percent: 0,
+    repayment_type: 'installments',
     amount_funded: amount,
     funding_percent: 100,
     lender_count: 1,
@@ -370,58 +391,67 @@ async function main() {
   console.log('Creating lender listings...')
 
   const listing1 = await createListing(l1.id, {
-    availableAmount: 5000000,
-    minLoan: 50000,
-    maxLoan: 1000000,
-    interestRate: 0.03,
-    ratePeriod: 'per_15_days',
+    availableAmount: 5000000, minLoan: 50000, maxLoan: 1000000,
+    interestRate: 0.03, ratePeriod: 'per_15_days',
     acceptedPurposes: ['personal', 'medical', 'education', 'debt_consolidation'],
     maxTermMonths: 12,
-    description: 'I lend to responsible borrowers for personal needs. Fast approval, flexible terms. I\'ve been lending privately for 5 years.',
+    description: 'I lend to responsible borrowers for personal needs. Fast approval, flexible terms. 5 years of private lending.',
+    packages: [
+      { name: '30-Day Lump Sum', repayment_type: 'lump_sum', interest_rate: 0.05, rate_period: 'flat', term_months: 1, description: 'Single repayment in 30 days. Best for short-term needs.' },
+      { name: '6-Month Installments', repayment_type: 'installments', interest_rate: 0.03, rate_period: 'monthly', term_months: 6, description: 'Fixed monthly payments over 6 months.' },
+      { name: '12-Month Installments', repayment_type: 'installments', interest_rate: 0.03, rate_period: 'monthly', term_months: 12, description: 'Spread repayment over a full year.' },
+    ],
   })
 
   const listing2 = await createListing(l2.id, {
-    availableAmount: 10000000,
-    minLoan: 100000,
-    maxLoan: 5000000,
-    interestRate: 0.05,
-    ratePeriod: 'monthly',
+    availableAmount: 10000000, minLoan: 100000, maxLoan: 5000000,
+    interestRate: 0.05, ratePeriod: 'monthly',
     acceptedPurposes: ['business', 'home_improvement', 'auto'],
     maxTermMonths: 60,
     description: 'Institutional lender. We fund business loans and home improvements. Professional underwriting, competitive rates.',
+    packages: [
+      { name: 'Standard Business', repayment_type: 'installments', interest_rate: 0.05, rate_period: 'monthly', term_months: 24, description: 'Fixed monthly payments over 2 years.' },
+      { name: 'Interest-Only Bridge', repayment_type: 'interest_only', interest_rate: 0.04, rate_period: 'monthly', term_months: 12, description: 'Pay interest monthly, principal at end. Good for cash flow.' },
+      { name: 'Long-Term Growth', repayment_type: 'installments', interest_rate: 0.045, rate_period: 'monthly', term_months: 48, description: 'Lower payments spread over 4 years.' },
+    ],
   })
 
   const listing3 = await createListing(l3.id, {
-    availableAmount: 8000000,
-    minLoan: 20000,
-    maxLoan: 2000000,
-    interestRate: 0.08,
-    ratePeriod: 'monthly',
+    availableAmount: 8000000, minLoan: 20000, maxLoan: 2000000,
+    interestRate: 0.08, ratePeriod: 'monthly',
     acceptedPurposes: [],
     maxTermMonths: 24,
     description: 'Open to all purposes. Higher rate but fast approval — I can turn around a decision in 24 hours.',
+    packages: [
+      { name: 'Daily Rate (Flexible)', repayment_type: 'daily_interest', interest_rate: 0.003, rate_period: 'daily', max_term_days: 90, description: 'Repay any time within 90 days. Interest accrues daily.' },
+      { name: '3-Month Lump Sum', repayment_type: 'lump_sum', interest_rate: 0.08, rate_period: 'monthly', term_months: 3, description: 'Full repayment after 3 months.' },
+      { name: '12-Month Installments', repayment_type: 'installments', interest_rate: 0.08, rate_period: 'monthly', term_months: 12, description: 'Standard monthly payments.' },
+    ],
   })
 
   const listing4 = await createListing(l4.id, {
-    availableAmount: 3000000,
-    minLoan: 10000,
-    maxLoan: 500000,
-    interestRate: 0.02,
-    ratePeriod: 'per_30_days',
+    availableAmount: 3000000, minLoan: 10000, maxLoan: 500000,
+    interestRate: 0.02, ratePeriod: 'per_30_days',
     acceptedPurposes: ['personal', 'education', 'medical'],
     maxTermMonths: 6,
     description: 'Small short-term loans only. I prefer to work with people I know or who come with a referral.',
+    packages: [
+      { name: 'Quick 30-Day', repayment_type: 'lump_sum', interest_rate: 0.02, rate_period: 'per_30_days', term_months: 1, description: 'Repay in full after 30 days.' },
+      { name: '3-Month Bi-Weekly', repayment_type: 'custom_schedule', interest_rate: 0.024, rate_period: 'annually', term_months: 3, payment_frequency: 'bi_weekly', description: 'Bi-weekly payments over 3 months.' },
+    ],
   })
 
   const listing5 = await createListing(l5.id, {
-    availableAmount: 6000000,
-    minLoan: 50000,
-    maxLoan: 2000000,
-    interestRate: 0.12,
-    ratePeriod: 'flat',
+    availableAmount: 6000000, minLoan: 50000, maxLoan: 2000000,
+    interestRate: 0.12, ratePeriod: 'flat',
     acceptedPurposes: ['business', 'auto', 'home_improvement', 'personal'],
     maxTermMonths: 36,
     description: 'Flat rate — no surprises. You know exactly what you owe from day one. Min 6 months, max 3 years.',
+    packages: [
+      { name: '6-Month Flat', repayment_type: 'installments', interest_rate: 0.12, rate_period: 'flat', term_months: 6, description: '12% flat on principal, paid monthly over 6 months.' },
+      { name: '12-Month Flat', repayment_type: 'installments', interest_rate: 0.12, rate_period: 'flat', term_months: 12, description: '12% flat over a year. Good for bigger amounts.' },
+      { name: '36-Month Flat', repayment_type: 'installments', interest_rate: 0.12, rate_period: 'flat', term_months: 36, description: 'Max term option with lowest monthly payment.' },
+    ],
   })
 
   // ── Active / Repaying Loans ────────────────────────────────────────────────

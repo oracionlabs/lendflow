@@ -21,8 +21,7 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
     .from('lender_listings')
     .select(`
       *,
-      users!lender_id (name, avatar_url, lender_profiles(lender_type, accredited, risk_tolerance)),
-      listing_packages(id)
+      users!lender_id (name, avatar_url, lender_profiles(lender_type, accredited, risk_tolerance))
     `)
     .eq('status', 'active')
     .order('created_at', { ascending: false })
@@ -33,7 +32,23 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
 
   const { data, error } = await query
   if (error) { res.status(500).json({ error: error.message }); return }
-  res.json({ listings: data })
+
+  // Attach package counts separately so missing table doesn't break listing browse
+  let listings = data as (typeof data[0] & { listing_packages: { id: string }[] })[]
+  try {
+    const ids = listings.map(l => l.id)
+    if (ids.length) {
+      const { data: pkgs } = await db.from('listing_packages').select('id, listing_id').in('listing_id', ids)
+      const byListing: Record<string, { id: string }[]> = {}
+      for (const p of pkgs ?? []) {
+        if (!byListing[p.listing_id]) byListing[p.listing_id] = []
+        byListing[p.listing_id].push({ id: p.id })
+      }
+      listings = listings.map(l => ({ ...l, listing_packages: byListing[l.id] ?? [] }))
+    }
+  } catch { /* listing_packages table may not exist yet on older deployments */ }
+
+  res.json({ listings })
 })
 
 // ─── Public: single listing ───────────────────────────────────────────────────
