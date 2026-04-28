@@ -26,6 +26,7 @@ interface Form {
   rate_period: RatePeriod
   payment_type: PaymentType
   due_date: string
+  lump_sum_days: number
   term_months: number
   payment_frequency: PaymentFrequency
   max_term_days: number
@@ -42,6 +43,7 @@ const INITIAL: Form = {
   rate_period: 'monthly',
   payment_type: 'installments',
   due_date: '',
+  lump_sum_days: 30,
   term_months: 12,
   payment_frequency: 'monthly',
   max_term_days: 90,
@@ -103,24 +105,30 @@ export function LoanOrigination() {
 
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm(f => ({ ...f, [k]: v }))
 
+  // For lump sum, derive due_date from lump_sum_days
+  const computedDueDate = useMemo(() => {
+    if (form.payment_type !== 'lump_sum' || !form.lump_sum_days) return form.due_date
+    const d = new Date()
+    d.setDate(d.getDate() + form.lump_sum_days)
+    return d.toISOString().split('T')[0]
+  }, [form.payment_type, form.lump_sum_days, form.due_date])
+
   // Calculated amounts
   const term = useMemo(() => {
-    if (form.payment_type === 'lump_sum' && form.due_date) {
-      return monthsBetween(new Date(), new Date(form.due_date))
+    if (form.payment_type === 'lump_sum') {
+      return Math.max(1, Math.ceil(form.lump_sum_days / 30))
     }
     if (form.payment_type === 'daily_interest') {
       return Math.ceil(form.max_term_days / 30)
     }
     return form.term_months
-  }, [form.payment_type, form.due_date, form.term_months, form.max_term_days])
+  }, [form.payment_type, form.lump_sum_days, form.term_months, form.max_term_days])
 
   const durationDays = useMemo(() => {
-    if (form.payment_type === 'lump_sum' && form.due_date) {
-      return daysBetween(new Date(), new Date(form.due_date))
-    }
+    if (form.payment_type === 'lump_sum') return form.lump_sum_days
     if (form.payment_type === 'daily_interest') return form.max_term_days
     return form.term_months * 30
-  }, [form.payment_type, form.due_date, form.term_months, form.max_term_days])
+  }, [form.payment_type, form.lump_sum_days, form.term_months, form.max_term_days])
 
   const calc = useMemo(() => {
     const p = form.amount
@@ -206,7 +214,7 @@ export function LoanOrigination() {
         monthly_payment: monthlyPayment,
         total_repayment: totalRepayment,
         repayment_type: form.payment_type,
-        due_date: form.payment_type === 'lump_sum' ? form.due_date : undefined,
+        due_date: form.payment_type === 'lump_sum' ? computedDueDate : undefined,
         term_months: ['installments', 'interest_only', 'custom_schedule'].includes(form.payment_type) ? form.term_months : undefined,
         payment_frequency: form.payment_type === 'custom_schedule' ? form.payment_frequency : undefined,
         max_term_days: form.payment_type === 'daily_interest' ? form.max_term_days : undefined,
@@ -235,7 +243,7 @@ export function LoanOrigination() {
   const step2Valid = form.amount > 0 && form.interest_rate > 0 && (() => {
     switch (form.payment_type) {
       case 'installments':    return form.term_months > 0
-      case 'lump_sum':        return !!form.due_date
+      case 'lump_sum':        return form.lump_sum_days > 0
       case 'interest_only':   return form.term_months > 0
       case 'daily_interest':  return form.max_term_days > 0
       case 'custom_schedule': return form.term_months > 0 && !!form.payment_frequency
@@ -255,7 +263,7 @@ export function LoanOrigination() {
         <div>
           <h2 className="text-xl font-bold">Loan recorded</h2>
           <p className="text-muted-foreground text-sm mt-1">
-            {formatCents(form.amount)} · {form.interest_rate}% p.a. · {form.payment_type === 'lump_sum' ? `Due ${form.due_date}` : `${form.term_months} months`}
+            {formatCents(form.amount)} · {form.interest_rate}% p.a. · {form.payment_type === 'lump_sum' ? `Due in ${form.lump_sum_days} days` : `${form.term_months} months`}
           </p>
           <p className="text-sm text-muted-foreground mt-2">
             {form.borrower_name}'s repayment schedule is now active.
@@ -359,21 +367,19 @@ export function LoanOrigination() {
 
           <div>
             <Label>Repayment type <span className="text-destructive">*</span></Label>
-            <div className="grid grid-cols-1 gap-2">
+            <select
+              value={form.payment_type}
+              onChange={e => {
+                const v = e.target.value as PaymentType
+                set('payment_type', v)
+                if (v === 'daily_interest') set('rate_period', 'daily')
+              }}
+              className="w-full rounded-lg border bg-background px-3 py-2.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            >
               {PAYMENT_TYPES.map(opt => (
-                <button key={opt.v} type="button"
-                  onClick={() => {
-                    set('payment_type', opt.v)
-                    if (opt.v === 'daily_interest') set('rate_period', 'daily')
-                  }}
-                  className={`flex items-center justify-between rounded-xl border-2 px-4 py-3 text-left transition-all ${
-                    form.payment_type === opt.v ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40'
-                  }`}>
-                  <p className="text-sm font-semibold">{opt.label}</p>
-                  <p className="text-xs text-muted-foreground">{opt.desc}</p>
-                </button>
+                <option key={opt.v} value={opt.v}>{opt.label} — {opt.desc}</option>
               ))}
-            </div>
+            </select>
           </div>
 
           <div className="space-y-2">
@@ -447,15 +453,20 @@ export function LoanOrigination() {
 
           {form.payment_type === 'lump_sum' && (
             <div>
-              <Label>Due date <span className="text-destructive">*</span></Label>
-              <DatePicker
-                value={form.due_date}
-                onChange={v => set('due_date', v)}
-                min={minDate.toISOString().split('T')[0]}
-                placeholder="Select repayment date"
-              />
-              {form.due_date && (
-                <p className="text-xs text-muted-foreground mt-1">{term} month{term !== 1 ? 's' : ''} from today</p>
+              <Label>Repay in (days) <span className="text-destructive">*</span></Label>
+              <div className="relative">
+                <Input
+                  type="number"
+                  value={form.lump_sum_days || ''}
+                  onChange={e => set('lump_sum_days', parseInt(e.target.value || '1'))}
+                  min={1}
+                  placeholder="30"
+                />
+              </div>
+              {form.lump_sum_days > 0 && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Due on <span className="font-medium text-foreground">{computedDueDate}</span>
+                </p>
               )}
             </div>
           )}
@@ -499,7 +510,7 @@ export function LoanOrigination() {
                 { label: 'Repayment type', value: PAYMENT_TYPES.find(t => t.v === form.payment_type)?.label ?? form.payment_type },
                 { label: 'Interest rate', value: `${form.interest_rate}% ${RATE_OPTIONS.find(o => o.value === form.rate_period)?.label.toLowerCase()}` },
                 form.payment_type === 'lump_sum'
-                  ? { label: 'Due date', value: form.due_date, accent: true }
+                  ? { label: 'Due date', value: `${form.lump_sum_days} days (${computedDueDate})`, accent: true }
                   : form.payment_type === 'interest_only'
                   ? { label: 'Monthly interest', value: `${formatCents(monthlyPayment)} × ${form.term_months - 1} months`, accent: true }
                   : form.payment_type === 'daily_interest'
