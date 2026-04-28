@@ -11,8 +11,8 @@ export function setCurrency(currency: string) {
   _currency = currency
 }
 
-export function formatCents(cents: number): string {
-  return new Intl.NumberFormat(undefined, { style: 'currency', currency: _currency }).format(cents / 100)
+export function formatCents(cents: number, currency?: string): string {
+  return new Intl.NumberFormat(undefined, { style: 'currency', currency: currency ?? _currency }).format(cents / 100)
 }
 
 const percentFmt = new Intl.NumberFormat('en-US', { style: 'percent', minimumFractionDigits: 2, maximumFractionDigits: 2 })

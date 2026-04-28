@@ -7,6 +7,7 @@ import {
   LOAN_PURPOSE_LABELS,
   REPAYMENT_TYPE_LABELS,
   PAYMENT_FREQUENCY_LABELS,
+  CURRENCIES,
   type LoanPackage,
   type RepaymentType,
   type PaymentFrequency,
@@ -42,13 +43,14 @@ interface Listing {
   accepted_purposes: string[]
   max_term_months: number | null
   description: string | null
+  currency: string
   status: string
 }
 
 const EMPTY: Omit<Listing, 'id'> = {
   available_amount: 0, min_loan: 10000, max_loan: 0,
   interest_rate: 0.05, rate_period: 'monthly',
-  accepted_purposes: [], max_term_months: null, description: '', status: 'active',
+  accepted_purposes: [], max_term_months: null, description: '', currency: 'USD', status: 'active',
 }
 
 const EMPTY_PKG: Omit<LoanPackage, 'id' | 'listing_id' | 'created_at' | 'updated_at'> = {
@@ -90,7 +92,7 @@ export function MyListing() {
         max_loan: existing.max_loan, interest_rate: existing.interest_rate,
         rate_period: existing.rate_period, accepted_purposes: existing.accepted_purposes ?? [],
         max_term_months: existing.max_term_months, description: existing.description ?? '',
-        status: existing.status,
+        currency: existing.currency ?? 'USD', status: existing.status,
       })
       setLoaded(true)
     }
@@ -212,6 +214,13 @@ export function MyListing() {
       {/* Capital */}
       <div className="card-base p-5 space-y-4">
         <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Capital</h2>
+        <div>
+          <label className="block text-sm font-medium mb-1.5">Currency</label>
+          <select value={form.currency} onChange={e => set('currency', e.target.value)}
+            className="w-full rounded-xl border bg-background px-3 py-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+            {CURRENCIES.map(c => <option key={c.code} value={c.code}>{c.label}</option>)}
+          </select>
+        </div>
         <div>
           <label className="block text-sm font-medium mb-1.5">Available to lend</label>
           <div className="relative">

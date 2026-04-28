@@ -44,6 +44,7 @@ interface CommitmentDetail {
     approved_amount: number
     monthly_payment: number
     total_repayment: number
+    currency?: string
   }
 }
 
@@ -107,6 +108,8 @@ export function CommitmentDetail() {
   )
 
   const loan = commitment.loans
+  const cur = loan.currency
+  const fmt = (cents: number): string => formatCents(cents, cur)
   const grade = loan.admin_override_grade ?? loan.ai_credit_grade
   const yieldProgress = commitment.expected_yield > 0
     ? (commitment.actual_yield / commitment.expected_yield) * 100
@@ -142,7 +145,7 @@ export function CommitmentDetail() {
             </p>
           </div>
           <div className="text-right flex-shrink-0">
-            <p className="text-xl font-bold">{formatCents(commitment.amount)}</p>
+            <p className="text-xl font-bold">{fmt(commitment.amount)}</p>
             <p className="text-xs text-muted-foreground">{commitment.share_percent.toFixed(2)}% share</p>
           </div>
         </div>
@@ -150,9 +153,9 @@ export function CommitmentDetail() {
         {/* KPI grid — 2 cols on mobile, 4 on desktop */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {[
-            { label: 'Committed', value: formatCents(commitment.amount), color: '' },
-            { label: 'Yield Earned', value: formatCents(commitment.actual_yield), color: 'text-primary' },
-            { label: 'Expected Yield', value: formatCents(commitment.expected_yield), color: '' },
+            { label: 'Committed', value: fmt(commitment.amount), color: '' },
+            { label: 'Yield Earned', value: fmt(commitment.actual_yield), color: 'text-primary' },
+            { label: 'Expected Yield', value: fmt(commitment.expected_yield), color: '' },
             {
               label: 'Status',
               value: commitment.status.replace('_', ' '),
@@ -236,9 +239,9 @@ export function CommitmentDetail() {
           <h2 className="font-semibold mb-3 text-sm">Loan Terms</h2>
           <div className="space-y-2.5">
             {[
-              { label: 'Loan Amount', value: formatCents(loan.approved_amount) },
-              { label: 'Monthly Payment', value: formatCents(loan.monthly_payment) },
-              { label: 'Total Repayment', value: formatCents(loan.total_repayment) },
+              { label: 'Loan Amount', value: fmt(loan.approved_amount) },
+              { label: 'Monthly Payment', value: fmt(loan.monthly_payment) },
+              { label: 'Total Repayment', value: fmt(loan.total_repayment) },
               { label: 'First Payment', value: loan.first_payment_date ? formatDate(loan.first_payment_date) : '—' },
               { label: 'Maturity', value: loan.maturity_date ? formatDate(loan.maturity_date) : '—' },
             ].map(({ label, value }) => (
@@ -271,7 +274,7 @@ export function CommitmentDetail() {
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(138 12% 91%)" vertical={false} />
               <XAxis dataKey="month" tick={{ fontSize: 10, fill: 'hsl(220 8% 48%)' }} axisLine={false} tickLine={false} />
               <YAxis tickFormatter={v => `$${(v / 100).toFixed(0)}`} tick={{ fontSize: 10, fill: 'hsl(220 8% 48%)' }} axisLine={false} tickLine={false} width={40} />
-              <Tooltip formatter={(v: unknown) => formatCents(v as number)} />
+              <Tooltip formatter={(v: unknown) => fmt(v as number)} />
               <Bar dataKey="interest" name="Interest" fill="hsl(142 52% 38%)" radius={[3, 3, 0, 0]} stackId="a" />
               <Bar dataKey="principal" name="Principal" fill="hsl(142 52% 70%)" radius={[3, 3, 0, 0]} stackId="a" />
             </BarChart>
@@ -302,9 +305,9 @@ export function CommitmentDetail() {
                   {yields.map(y => (
                     <tr key={y.id} className="border-b border-border/50 last:border-0 hover:bg-muted/20">
                       <td className="p-3 text-xs text-muted-foreground">{formatDate(y.distributed_at)}</td>
-                      <td className="p-3 text-right font-mono text-xs">{formatCents(y.principal_return)}</td>
-                      <td className="p-3 text-right font-mono text-xs text-primary">{formatCents(y.interest_return)}</td>
-                      <td className="p-3 text-right font-mono text-xs font-medium">{formatCents(y.total_return)}</td>
+                      <td className="p-3 text-right font-mono text-xs">{fmt(y.principal_return)}</td>
+                      <td className="p-3 text-right font-mono text-xs text-primary">{fmt(y.interest_return)}</td>
+                      <td className="p-3 text-right font-mono text-xs font-medium">{fmt(y.total_return)}</td>
                     </tr>
                   ))}
                 </tbody>

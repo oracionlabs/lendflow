@@ -34,6 +34,7 @@ export type ScheduleStatus =
   | 'waived'
 
 export interface Loan {
+  currency?: string
   repayment_type?: import('./package.types').RepaymentType
   package_id?: string | null
   payment_frequency?: import('./package.types').PaymentFrequency | null

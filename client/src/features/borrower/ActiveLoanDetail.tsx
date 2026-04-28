@@ -118,6 +118,7 @@ export function ActiveLoanDetail() {
   if (loanLoading) return <TableSkeleton />
 
   const loan = loanData!
+  const fmt = (cents: number): string => formatCents(cents, loan.currency)
 
   return (
     <div className="max-w-4xl space-y-8">
@@ -130,7 +131,7 @@ export function ActiveLoanDetail() {
           </div>
         </div>
         <div className="text-right space-y-2">
-          <p className="text-3xl font-bold">{formatCents(loan.approved_amount ?? 0)}</p>
+          <p className="text-3xl font-bold">{fmt(loan.approved_amount ?? 0)}</p>
           <p className="text-sm text-muted-foreground">{loan.term_months} month term</p>
           {CANCELLABLE.includes(loan.status) && !showCancel && (
             <button
@@ -190,7 +191,7 @@ export function ActiveLoanDetail() {
           <div className="grid grid-cols-3 gap-4">
             <div className="card-base p-4">
               <p className="text-xs text-muted-foreground">Monthly Payment</p>
-              <p className="text-xl font-bold mt-1">{formatCents(loan.monthly_payment ?? 0)}</p>
+              <p className="text-xl font-bold mt-1">{fmt(loan.monthly_payment ?? 0)}</p>
             </div>
             <div className="card-base p-4">
               <p className="text-xs text-muted-foreground">Interest Rate</p>
@@ -198,7 +199,7 @@ export function ActiveLoanDetail() {
             </div>
             <div className="card-base p-4">
               <p className="text-xs text-muted-foreground">Total Repayment</p>
-              <p className="text-xl font-bold mt-1">{formatCents(loan.total_repayment ?? 0)}</p>
+              <p className="text-xl font-bold mt-1">{fmt(loan.total_repayment ?? 0)}</p>
             </div>
           </div>
 
@@ -211,8 +212,8 @@ export function ActiveLoanDetail() {
               <div className="h-3 rounded-full bg-primary transition-all" style={{ width: `${progressPct}%` }} />
             </div>
             <div className="flex justify-between text-xs text-muted-foreground">
-              <span>Paid: {formatCents(totalPaid)}</span>
-              <span>Total: {formatCents(totalDue)}</span>
+              <span>Paid: {fmt(totalPaid)}</span>
+              <span>Total: {fmt(totalDue)}</span>
             </div>
           </div>
 
@@ -223,12 +224,12 @@ export function ActiveLoanDetail() {
                   <p className="font-semibold">Next Payment Due</p>
                   <p className="text-sm text-muted-foreground">{formatDate(nextDue.due_date)}</p>
                 </div>
-                <p className="text-2xl font-bold">{formatCents(nextDue.total_due + nextDue.late_fee)}</p>
+                <p className="text-2xl font-bold">{fmt(nextDue.total_due + nextDue.late_fee)}</p>
               </div>
 
               {nextDue.late_fee > 0 && (
                 <div className="rounded-md bg-red-50 border border-red-200 p-3 text-sm text-red-700">
-                  Includes late fee of {formatCents(nextDue.late_fee)}
+                  Includes late fee of {fmt(nextDue.late_fee)}
                 </div>
               )}
 
@@ -260,8 +261,8 @@ export function ActiveLoanDetail() {
 
                 {payMode === 'payoff' && payoffData && (
                   <div className="rounded-md bg-green-50 border border-green-200 p-3 text-sm">
-                    <p className="font-medium text-green-800">Pay {formatCents(payoffData.payoff_amount)} to close your loan</p>
-                    <p className="text-green-700 mt-0.5">You'll save {formatCents(payoffData.interest_saved)} in interest</p>
+                    <p className="font-medium text-green-800">Pay {fmt(payoffData.payoff_amount)} to close your loan</p>
+                    <p className="text-green-700 mt-0.5">You'll save {fmt(payoffData.interest_saved)} in interest</p>
                   </div>
                 )}
 
@@ -274,7 +275,7 @@ export function ActiveLoanDetail() {
                     {paying ? 'Processing…' : 'Make Payment'}
                   </button>
                   <p className="text-xs text-muted-foreground">
-                    Wallet balance: {formatCents(walletData?.available_balance ?? 0)}
+                    Wallet balance: {fmt(walletData?.available_balance ?? 0)}
                   </p>
                 </div>
               </div>
@@ -318,9 +319,9 @@ export function ActiveLoanDetail() {
                   <tr key={row.id} className="border-b last:border-0 hover:bg-muted/30">
                     <td className="p-3 text-muted-foreground">{row.installment_number}</td>
                     <td className="p-3">{formatDate(row.due_date)}</td>
-                    <td className="p-3 text-right font-mono">{formatCents(row.principal_due)}</td>
-                    <td className="p-3 text-right font-mono">{formatCents(row.interest_due)}</td>
-                    <td className="p-3 text-right font-mono font-medium">{formatCents(row.total_due)}</td>
+                    <td className="p-3 text-right font-mono">{fmt(row.principal_due)}</td>
+                    <td className="p-3 text-right font-mono">{fmt(row.interest_due)}</td>
+                    <td className="p-3 text-right font-mono font-medium">{fmt(row.total_due)}</td>
                     <td className="p-3">
                       <div className="flex justify-center"><ScheduleStatusIcon status={row.status} /></div>
                     </td>

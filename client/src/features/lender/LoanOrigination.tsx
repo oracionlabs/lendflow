@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import api from '@/lib/api'
 import { formatCents } from '@/lib/utils'
 import { toast } from 'sonner'
-import { LOAN_PURPOSE_LABELS } from '@lendflow/shared'
+import { LOAN_PURPOSE_LABELS, CURRENCIES } from '@lendflow/shared'
 import { CheckCircle2, Upload, X, ArrowRight, ArrowLeft } from 'lucide-react'
 import { DatePicker } from '@/components/shared/DatePicker'
 
@@ -30,6 +30,7 @@ interface Form {
   term_months: number
   payment_frequency: PaymentFrequency
   max_term_days: number
+  currency: string
 }
 
 const INITIAL: Form = {
@@ -47,6 +48,7 @@ const INITIAL: Form = {
   term_months: 12,
   payment_frequency: 'monthly',
   max_term_days: 90,
+  currency: 'USD',
 }
 
 const RATE_OPTIONS: { value: RatePeriod; label: string; desc: string }[] = [
@@ -221,6 +223,7 @@ export function LoanOrigination() {
         term_months: ['installments', 'interest_only', 'custom_schedule'].includes(form.payment_type) ? form.term_months : undefined,
         payment_frequency: form.payment_type === 'custom_schedule' ? form.payment_frequency : undefined,
         max_term_days: form.payment_type === 'daily_interest' ? form.max_term_days : undefined,
+        currency: form.currency,
       })
       return data
     },
@@ -366,6 +369,14 @@ export function LoanOrigination() {
                 className="w-full rounded-lg border bg-white pl-7 pr-3 py-2.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
               />
             </div>
+          </div>
+
+          <div>
+            <Label>Currency</Label>
+            <select value={form.currency} onChange={e => set('currency', e.target.value)}
+              className="w-full rounded-lg border bg-background px-3 py-2.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+              {CURRENCIES.map(c => <option key={c.code} value={c.code}>{c.label}</option>)}
+            </select>
           </div>
 
           <div>

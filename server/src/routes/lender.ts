@@ -252,6 +252,7 @@ router.post('/loans/new', async (req: Request, res: Response): Promise<void> => 
     term_months: termMonthsInput,
     payment_frequency,
     max_term_days,
+    currency,
   } = req.body as {
     borrower_name: string
     borrower_email?: string
@@ -268,6 +269,7 @@ router.post('/loans/new', async (req: Request, res: Response): Promise<void> => 
     term_months?: number
     payment_frequency?: string
     max_term_days?: number
+    currency?: string
   }
 
   // repayment_type is the new field; payment_type is legacy — accept both
@@ -407,6 +409,7 @@ router.post('/loans/new', async (req: Request, res: Response): Promise<void> => 
     repayment_type: effectiveRepaymentType,
     payment_frequency: payment_frequency ?? null,
     max_term_days: max_term_days ?? null,
+    currency: currency ?? 'USD',
     amount_funded: amount_requested,
     funding_percent: 100,
     lender_count: 1,

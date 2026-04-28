@@ -87,11 +87,11 @@ router.post('/me/listing', requireLender, async (req: Request, res: Response): P
   const user = res.locals.user
   const {
     available_amount, min_loan, max_loan, interest_rate, rate_period,
-    accepted_purposes, max_term_months, description, status,
+    accepted_purposes, max_term_months, description, currency, status,
   } = req.body as {
     available_amount: number; min_loan?: number; max_loan?: number
     interest_rate: number; rate_period: string; accepted_purposes?: string[]
-    max_term_months?: number; description?: string; status?: string
+    max_term_months?: number; description?: string; currency?: string; status?: string
   }
 
   if (!available_amount || !interest_rate || !rate_period) {
@@ -112,6 +112,7 @@ router.post('/me/listing', requireLender, async (req: Request, res: Response): P
       accepted_purposes: accepted_purposes ?? [],
       max_term_months: max_term_months ?? null,
       description: description ?? null,
+      currency: currency ?? 'USD',
       status: status ?? 'active',
     }, { onConflict: 'lender_id' })
     .select()
@@ -273,6 +274,7 @@ router.post('/:id/apply', requireBorrower, async (req: Request, res: Response): 
     package_id: package_id ?? null,
     payment_frequency: effectiveFrequency,
     max_term_days: effectiveMaxTermDays,
+    currency: (listing as Record<string, unknown>).currency as string ?? 'USD',
     amount_funded: 0,
     funding_percent: 0,
     lender_count: 0,
