@@ -1,13 +1,22 @@
 import 'dotenv/config'
 import { createApp } from './app'
+import { runMigrations } from './lib/migrate'
 import { runLatePaymentJob } from './jobs/latePayments'
 
 const PORT = parseInt(process.env.PORT ?? '3001', 10)
 
-const app = createApp()
+async function start() {
+  await runMigrations()
 
-app.listen(PORT, () => {
-  console.log(`[server] LendFlow API running on http://localhost:${PORT}`)
+  const app = createApp()
+  app.listen(PORT, () => {
+    console.log(`[server] LendFlow API running on http://localhost:${PORT}`)
+  })
+}
+
+start().catch(err => {
+  console.error('[server] Startup failed:', err)
+  process.exit(1)
 })
 
 // Run late payment detection daily (every 24 hours)
