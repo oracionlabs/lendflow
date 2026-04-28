@@ -9,8 +9,9 @@ import { CheckCircle2, Upload, X, ArrowRight, ArrowLeft } from 'lucide-react'
 
 const PURPOSES = Object.entries(LOAN_PURPOSE_LABELS)
 
-type PaymentType = 'lump_sum' | 'installments'
-type RatePeriod = 'per_15_days' | 'per_30_days' | 'monthly' | 'annually' | 'flat'
+type PaymentType = 'lump_sum' | 'installments' | 'interest_only' | 'daily_interest' | 'custom_schedule'
+type RatePeriod = 'per_15_days' | 'per_30_days' | 'monthly' | 'annually' | 'flat' | 'daily'
+type PaymentFrequency = 'weekly' | 'bi_weekly' | 'monthly' | 'quarterly'
 type Step = 1 | 2 | 3 | 4
 
 interface Form {
@@ -25,6 +26,8 @@ interface Form {
   payment_type: PaymentType
   due_date: string
   term_months: number
+  payment_frequency: PaymentFrequency
+  max_term_days: number
 }
 
 const INITIAL: Form = {
@@ -39,6 +42,8 @@ const INITIAL: Form = {
   payment_type: 'installments',
   due_date: '',
   term_months: 12,
+  payment_frequency: 'monthly',
+  max_term_days: 90,
 }
 
 const RATE_OPTIONS: { value: RatePeriod; label: string; desc: string }[] = [
@@ -47,6 +52,22 @@ const RATE_OPTIONS: { value: RatePeriod; label: string; desc: string }[] = [
   { value: 'monthly',     label: 'Monthly',       desc: 'Rate applies each calendar month' },
   { value: 'annually',    label: 'Annually',      desc: 'Standard annual rate (APR)' },
   { value: 'flat',        label: 'Flat total',    desc: 'One-time % of principal, any duration' },
+  { value: 'daily',       label: 'Daily',         desc: 'Rate accrues each day' },
+]
+
+const PAYMENT_TYPES: { v: PaymentType; label: string; desc: string }[] = [
+  { v: 'installments',    label: 'Monthly Installments', desc: 'Fixed payments each month' },
+  { v: 'lump_sum',        label: 'Single Repayment',     desc: 'Full amount on a due date' },
+  { v: 'interest_only',   label: 'Interest-Only',        desc: 'Interest monthly + balloon' },
+  { v: 'daily_interest',  label: 'Daily Interest',       desc: 'Accrues daily, flexible repay' },
+  { v: 'custom_schedule', label: 'Custom Schedule',      desc: 'Choose payment frequency' },
+]
+
+const FREQUENCY_OPTIONS: { v: PaymentFrequency; label: string }[] = [
+  { v: 'weekly', label: 'Weekly' },
+  { v: 'bi_weekly', label: 'Bi-weekly' },
+  { v: 'monthly', label: 'Monthly' },
+  { v: 'quarterly', label: 'Quarterly' },
 ]
 
 function monthsBetween(a: Date, b: Date) {
@@ -86,39 +107,55 @@ export function LoanOrigination() {
     if (form.payment_type === 'lump_sum' && form.due_date) {
       return monthsBetween(new Date(), new Date(form.due_date))
     }
+    if (form.payment_type === 'daily_interest') {
+      return Math.ceil(form.max_term_days / 30)
+    }
     return form.term_months
-  }, [form.payment_type, form.due_date, form.term_months])
+  }, [form.payment_type, form.due_date, form.term_months, form.max_term_days])
 
   const durationDays = useMemo(() => {
     if (form.payment_type === 'lump_sum' && form.due_date) {
       return daysBetween(new Date(), new Date(form.due_date))
     }
+    if (form.payment_type === 'daily_interest') return form.max_term_days
     return form.term_months * 30
-  }, [form.payment_type, form.due_date, form.term_months])
+  }, [form.payment_type, form.due_date, form.term_months, form.max_term_days])
 
   const calc = useMemo(() => {
     const p = form.amount
     const r = form.interest_rate / 100
 
-    let totalInt = 0
+    // Interest-only: pay r/month interest, full principal in last payment
+    if (form.payment_type === 'interest_only') {
+      const monthlyInt = Math.round(p * r)
+      const totalInt = monthlyInt * term
+      return { monthlyPayment: monthlyInt, totalRepayment: p + totalInt, totalInterest: totalInt, balloonPayment: p + monthlyInt }
+    }
 
+    // Daily interest: accrues daily, single worst-case figure
+    if (form.payment_type === 'daily_interest') {
+      const totalInt = Math.round(p * r * form.max_term_days)
+      return { monthlyPayment: 0, totalRepayment: p + totalInt, totalInterest: totalInt }
+    }
+
+    // Custom schedule: amortize over N frequency periods
+    if (form.payment_type === 'custom_schedule') {
+      const ppy: Record<PaymentFrequency, number> = { weekly: 52, bi_weekly: 26, monthly: 12, quarterly: 4 }
+      const totalPeriods = Math.round((form.term_months / 12) * ppy[form.payment_frequency])
+      const rp = r / ppy[form.payment_frequency]
+      const payment = rp === 0 ? Math.round(p / totalPeriods)
+        : Math.round((p * (rp * Math.pow(1 + rp, totalPeriods))) / (Math.pow(1 + rp, totalPeriods) - 1))
+      const totalRep = payment * totalPeriods
+      return { monthlyPayment: payment, totalRepayment: totalRep, totalInterest: totalRep - p }
+    }
+
+    let totalInt = 0
     switch (form.rate_period) {
-      case 'per_15_days': {
-        const periods = Math.max(1, Math.round(durationDays / 15))
-        totalInt = Math.round(p * r * periods)
-        break
-      }
-      case 'per_30_days': {
-        const periods = Math.max(1, Math.round(durationDays / 30))
-        totalInt = Math.round(p * r * periods)
-        break
-      }
-      case 'monthly': {
-        totalInt = Math.round(p * r * term)
-        break
-      }
+      case 'per_15_days': totalInt = Math.round(p * r * Math.max(1, Math.round(durationDays / 15))); break
+      case 'per_30_days': totalInt = Math.round(p * r * Math.max(1, Math.round(durationDays / 30))); break
+      case 'monthly':     totalInt = Math.round(p * r * term); break
+      case 'daily':       totalInt = Math.round(p * r * durationDays); break
       case 'annually': {
-        // Standard amortizing APR for installments, simple for lump sum
         if (form.payment_type === 'installments' && term > 0) {
           const rm = r / 12
           const monthly = rm === 0 ? Math.round(p / term)
@@ -130,26 +167,24 @@ export function LoanOrigination() {
         break
       }
       case 'flat':
-      default:
-        totalInt = Math.round(p * r)
-        break
+      default: totalInt = Math.round(p * r); break
     }
 
     const totalRep = p + totalInt
-
     if (form.payment_type === 'lump_sum') {
       return { monthlyPayment: totalRep, totalRepayment: totalRep, totalInterest: totalInt }
     }
-
     const monthly = term > 0 ? Math.round(totalRep / term) : 0
     return { monthlyPayment: monthly, totalRepayment: monthly * term, totalInterest: monthly * term - p }
-  }, [form.amount, form.interest_rate, form.rate_period, form.payment_type, term, durationDays])
+  }, [form.amount, form.interest_rate, form.rate_period, form.payment_type, form.payment_frequency, form.max_term_days, term, durationDays])
 
   const { monthlyPayment, totalRepayment, totalInterest } = calc
+  const balloonPayment = (calc as { balloonPayment?: number }).balloonPayment
 
   // Annual rate equivalent for server storage
   const annualRate = useMemo(() => {
     const r = form.interest_rate / 100
+    if (form.rate_period === 'daily') return r * 365
     if (form.rate_period === 'flat') return durationDays > 0 ? r / (durationDays / 365) : r
     if (form.rate_period === 'per_15_days') return r * (365 / 15)
     if (form.rate_period === 'per_30_days') return r * (365 / 30)
@@ -169,9 +204,11 @@ export function LoanOrigination() {
         interest_rate: annualRate,
         monthly_payment: monthlyPayment,
         total_repayment: totalRepayment,
-        payment_type: form.payment_type,
+        repayment_type: form.payment_type,
         due_date: form.payment_type === 'lump_sum' ? form.due_date : undefined,
-        term_months: form.payment_type === 'installments' ? form.term_months : undefined,
+        term_months: ['installments', 'interest_only', 'custom_schedule'].includes(form.payment_type) ? form.term_months : undefined,
+        payment_frequency: form.payment_type === 'custom_schedule' ? form.payment_frequency : undefined,
+        max_term_days: form.payment_type === 'daily_interest' ? form.max_term_days : undefined,
       })
       return data
     },
@@ -194,8 +231,15 @@ export function LoanOrigination() {
 
   // Step validity
   const step1Valid = form.borrower_name.trim().length > 0
-  const step2Valid = form.amount > 0 && form.interest_rate > 0 &&
-    (form.payment_type === 'installments' ? form.term_months > 0 : !!form.due_date)
+  const step2Valid = form.amount > 0 && form.interest_rate > 0 && (() => {
+    switch (form.payment_type) {
+      case 'installments':    return form.term_months > 0
+      case 'lump_sum':        return !!form.due_date
+      case 'interest_only':   return form.term_months > 0
+      case 'daily_interest':  return form.max_term_days > 0
+      case 'custom_schedule': return form.term_months > 0 && !!form.payment_frequency
+    }
+  })()
 
   const STEPS = ['Borrower', 'Terms', 'Review', 'Finalise']
 
@@ -314,21 +358,18 @@ export function LoanOrigination() {
 
           <div>
             <Label>Repayment type <span className="text-destructive">*</span></Label>
-            <div className="grid grid-cols-2 gap-3">
-              {([
-                { v: 'installments' as PaymentType, label: 'Monthly installments', desc: 'Fixed payments each month' },
-                { v: 'lump_sum' as PaymentType, label: 'Single repayment', desc: 'Full amount on a due date' },
-              ]).map(opt => (
-                <button
-                  key={opt.v}
-                  type="button"
-                  onClick={() => set('payment_type', opt.v)}
-                  className={`rounded-xl border-2 p-4 text-left transition-all ${
+            <div className="grid grid-cols-1 gap-2">
+              {PAYMENT_TYPES.map(opt => (
+                <button key={opt.v} type="button"
+                  onClick={() => {
+                    set('payment_type', opt.v)
+                    if (opt.v === 'daily_interest') set('rate_period', 'daily')
+                  }}
+                  className={`flex items-center justify-between rounded-xl border-2 px-4 py-3 text-left transition-all ${
                     form.payment_type === opt.v ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40'
-                  }`}
-                >
+                  }`}>
                   <p className="text-sm font-semibold">{opt.label}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{opt.desc}</p>
+                  <p className="text-xs text-muted-foreground">{opt.desc}</p>
                 </button>
               ))}
             </div>
@@ -347,7 +388,7 @@ export function LoanOrigination() {
               />
               <span className="absolute right-3 top-2.5 text-muted-foreground text-sm">%</span>
             </div>
-            <div className="grid grid-cols-5 gap-1.5">
+            <div className="grid grid-cols-3 gap-1.5">
               {RATE_OPTIONS.map(opt => (
                 <button
                   key={opt.value}
@@ -369,29 +410,45 @@ export function LoanOrigination() {
             </p>
           </div>
 
-          {form.payment_type === 'installments' && (
+          {['installments', 'interest_only', 'custom_schedule'].includes(form.payment_type) && (
             <div>
-              <Label>Number of months <span className="text-destructive">*</span></Label>
-              <Input
-                type="number"
-                value={form.term_months}
-                onChange={e => set('term_months', parseInt(e.target.value || '1'))}
-                min={1}
-                max={360}
-                placeholder="12"
-              />
+              <Label>Term (months) <span className="text-destructive">*</span></Label>
+              <Input type="number" value={form.term_months}
+                onChange={e => set('term_months', parseInt(e.target.value || '1'))} min={1} max={360} placeholder="12" />
+              {form.payment_type === 'interest_only' && (
+                <p className="text-xs text-muted-foreground mt-1">Interest is paid monthly; full principal is due in the final payment.</p>
+              )}
+            </div>
+          )}
+
+          {form.payment_type === 'custom_schedule' && (
+            <div>
+              <Label>Payment frequency <span className="text-destructive">*</span></Label>
+              <div className="grid grid-cols-4 gap-2">
+                {FREQUENCY_OPTIONS.map(f => (
+                  <button key={f.v} type="button" onClick={() => set('payment_frequency', f.v)}
+                    className={`rounded-lg border py-2 text-xs font-medium transition-all ${
+                      form.payment_frequency === f.v ? 'bg-primary text-white border-primary' : 'border-border hover:bg-muted'
+                    }`}>{f.label}</button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {form.payment_type === 'daily_interest' && (
+            <div>
+              <Label>Max repayment period (days) <span className="text-destructive">*</span></Label>
+              <Input type="number" value={form.max_term_days}
+                onChange={e => set('max_term_days', parseInt(e.target.value || '30'))} min={1} placeholder="90" />
+              <p className="text-xs text-muted-foreground mt-1">Borrower can repay any time within this window. Interest accrues daily.</p>
             </div>
           )}
 
           {form.payment_type === 'lump_sum' && (
             <div>
               <Label>Due date <span className="text-destructive">*</span></Label>
-              <Input
-                type="date"
-                value={form.due_date}
-                min={minDate.toISOString().split('T')[0]}
-                onChange={e => set('due_date', e.target.value)}
-              />
+              <Input type="date" value={form.due_date} min={minDate.toISOString().split('T')[0]}
+                onChange={e => set('due_date', e.target.value)} />
               {form.due_date && (
                 <p className="text-xs text-muted-foreground mt-1">{term} month{term !== 1 ? 's' : ''} from today</p>
               )}
@@ -434,14 +491,20 @@ export function LoanOrigination() {
                 form.borrower_email ? { label: 'Email', value: form.borrower_email } : null,
                 form.borrower_phone ? { label: 'Phone', value: form.borrower_phone } : null,
                 { label: 'Amount', value: formatCents(form.amount) },
+                { label: 'Repayment type', value: PAYMENT_TYPES.find(t => t.v === form.payment_type)?.label ?? form.payment_type },
                 { label: 'Interest rate', value: `${form.interest_rate}% ${RATE_OPTIONS.find(o => o.value === form.rate_period)?.label.toLowerCase()}` },
-                {
-                  label: form.payment_type === 'lump_sum' ? 'Repayment' : 'Monthly payment',
-                  value: form.payment_type === 'lump_sum'
-                    ? `${formatCents(totalRepayment)} on ${form.due_date}`
-                    : `${formatCents(monthlyPayment)} × ${form.term_months} months`,
-                  accent: true,
-                },
+                form.payment_type === 'lump_sum'
+                  ? { label: 'Due date', value: form.due_date, accent: true }
+                  : form.payment_type === 'interest_only'
+                  ? { label: 'Monthly interest', value: `${formatCents(monthlyPayment)} × ${form.term_months - 1} months`, accent: true }
+                  : form.payment_type === 'daily_interest'
+                  ? { label: 'Max term', value: `${form.max_term_days} days`, accent: true }
+                  : form.payment_type === 'custom_schedule'
+                  ? { label: `${FREQUENCY_OPTIONS.find(f => f.v === form.payment_frequency)?.label} payment`, value: formatCents(monthlyPayment), accent: true }
+                  : { label: 'Monthly payment', value: `${formatCents(monthlyPayment)} × ${form.term_months} months`, accent: true },
+                form.payment_type === 'interest_only' && balloonPayment
+                  ? { label: 'Balloon payment', value: formatCents(balloonPayment) }
+                  : null,
                 { label: 'Total repayment', value: formatCents(totalRepayment) },
                 { label: 'Total interest', value: formatCents(totalInterest) },
                 { label: 'Purpose', value: LOAN_PURPOSE_LABELS[form.purpose] ?? form.purpose },

@@ -9,11 +9,8 @@ import { CardSkeleton } from '@/components/shared/LoadingSkeleton'
 import { EmptyState } from '@/components/shared/EmptyState'
 
 const RATE_PERIOD_LABELS: Record<string, string> = {
-  per_15_days: '/ 15 days',
-  per_30_days: '/ 30 days',
-  monthly: '/ month',
-  annually: '/ year',
-  flat: 'flat',
+  per_15_days: '/ 15 days', per_30_days: '/ 30 days',
+  monthly: '/ month', annually: '/ year', flat: 'flat', daily: '/ day',
 }
 
 interface Listing {
@@ -27,6 +24,7 @@ interface Listing {
   accepted_purposes: string[]
   max_term_months: number | null
   description: string | null
+  listing_packages: { id: string }[]
   users: { name: string; avatar_url: string | null; lender_profiles: { lender_type: string | null; accredited: boolean } | null }
 }
 
@@ -146,6 +144,11 @@ export function BrowseListings() {
                       {(listing.accepted_purposes?.length ?? 0) > 2 && (
                         <span className="rounded-full bg-muted px-2.5 py-1 text-[11px] text-muted-foreground">
                           +{listing.accepted_purposes.length - 2} more
+                        </span>
+                      )}
+                      {(listing.listing_packages?.length ?? 0) > 0 && (
+                        <span className="rounded-full bg-primary/10 text-primary px-2.5 py-1 text-[11px] font-medium">
+                          {listing.listing_packages.length} package{listing.listing_packages.length !== 1 ? 's' : ''}
                         </span>
                       )}
                     </div>

@@ -247,8 +247,11 @@ router.post('/loans/new', async (req: Request, res: Response): Promise<void> => 
     monthly_payment: clientMonthlyPayment,
     total_repayment: clientTotalRepayment,
     payment_type,
+    repayment_type: repaymentTypeInput,
     due_date,
     term_months: termMonthsInput,
+    payment_frequency,
+    max_term_days,
   } = req.body as {
     borrower_name: string
     borrower_email?: string
@@ -259,21 +262,35 @@ router.post('/loans/new', async (req: Request, res: Response): Promise<void> => 
     interest_rate: number
     monthly_payment: number
     total_repayment: number
-    payment_type: 'lump_sum' | 'installments'
+    payment_type: string
+    repayment_type?: string
     due_date?: string
     term_months?: number
+    payment_frequency?: string
+    max_term_days?: number
   }
 
-  if (!borrower_name || !purpose || !amount_requested || !payment_type) {
-    res.status(400).json({ error: 'borrower_name, purpose, amount_requested, and payment_type are required' })
+  // repayment_type is the new field; payment_type is legacy — accept both
+  const effectiveRepaymentType = repaymentTypeInput ?? payment_type ?? 'installments'
+
+  if (!borrower_name || !purpose || !amount_requested || !effectiveRepaymentType) {
+    res.status(400).json({ error: 'borrower_name, purpose, amount_requested, and repayment_type are required' })
     return
   }
-  if (payment_type === 'lump_sum' && !due_date) {
+  if (effectiveRepaymentType === 'lump_sum' && !due_date) {
     res.status(400).json({ error: 'due_date is required for lump sum payment' })
     return
   }
-  if (payment_type === 'installments' && !termMonthsInput) {
-    res.status(400).json({ error: 'term_months is required for installment payment' })
+  if (['installments', 'interest_only'].includes(effectiveRepaymentType) && !termMonthsInput) {
+    res.status(400).json({ error: 'term_months is required for this repayment type' })
+    return
+  }
+  if (effectiveRepaymentType === 'daily_interest' && !max_term_days) {
+    res.status(400).json({ error: 'max_term_days is required for daily_interest' })
+    return
+  }
+  if (effectiveRepaymentType === 'custom_schedule' && (!termMonthsInput || !payment_frequency)) {
+    res.status(400).json({ error: 'term_months and payment_frequency are required for custom_schedule' })
     return
   }
 
@@ -353,12 +370,17 @@ router.post('/loans/new', async (req: Request, res: Response): Promise<void> => 
   let term_months: number
   let maturityDate: string
 
-  if (payment_type === 'lump_sum') {
+  if (effectiveRepaymentType === 'lump_sum') {
     const dueD = new Date(due_date!)
     term_months = Math.max(1,
       (dueD.getFullYear() - today.getFullYear()) * 12 + (dueD.getMonth() - today.getMonth())
     )
     maturityDate = due_date!
+  } else if (effectiveRepaymentType === 'daily_interest') {
+    term_months = Math.ceil((max_term_days ?? 90) / 30)
+    const mat = new Date(today)
+    mat.setDate(mat.getDate() + (max_term_days ?? 90))
+    maturityDate = mat.toISOString().split('T')[0]
   } else {
     term_months = termMonthsInput!
     const mat = new Date(firstPaymentDate)
@@ -382,6 +404,9 @@ router.post('/loans/new', async (req: Request, res: Response): Promise<void> => 
     total_repayment: totalRepayment,
     origination_fee: 0,
     origination_fee_percent: 0,
+    repayment_type: effectiveRepaymentType,
+    payment_frequency: payment_frequency ?? null,
+    max_term_days: max_term_days ?? null,
     amount_funded: amount_requested,
     funding_percent: 100,
     lender_count: 1,
@@ -409,43 +434,50 @@ router.post('/loans/new', async (req: Request, res: Response): Promise<void> => 
     funded_at: today.toISOString(),
   })
 
-  // Build amortization schedule
-  const { calculateAmortization } = await import('../lib/amortization')
-  if (payment_type === 'lump_sum') {
-    // Single row schedule
-    await db.from('loan_schedule').insert({
+  // Build amortization schedule based on repayment type
+  const {
+    calculateAmortization,
+    calculateInterestOnly,
+    calculateDailyInterest,
+    calculateCustomSchedule,
+  } = await import('../lib/amortization')
+
+  let scheduleRows: { installment_number: number; due_date: string; principal_due: number; interest_due: number; total_due: number }[]
+
+  if (effectiveRepaymentType === 'lump_sum') {
+    scheduleRows = [{ installment_number: 1, due_date: maturityDate, principal_due: amount_requested, interest_due: totalRepayment - amount_requested, total_due: totalRepayment }]
+  } else if (effectiveRepaymentType === 'interest_only') {
+    const result = calculateInterestOnly(amount_requested, interest_rate, term_months, firstPaymentStr)
+    scheduleRows = result.schedule
+  } else if (effectiveRepaymentType === 'daily_interest') {
+    const dailyRate = interest_rate / 365
+    const result = calculateDailyInterest(amount_requested, dailyRate, max_term_days ?? 90, firstPaymentStr)
+    scheduleRows = result.schedule
+  } else if (effectiveRepaymentType === 'custom_schedule') {
+    const freq = (payment_frequency ?? 'monthly') as 'weekly' | 'bi_weekly' | 'monthly' | 'quarterly'
+    const result = calculateCustomSchedule(amount_requested, interest_rate, term_months, freq, firstPaymentStr)
+    scheduleRows = result.schedule
+  } else {
+    const amort = calculateAmortization(amount_requested, interest_rate, term_months, firstPaymentStr)
+    scheduleRows = amort.schedule
+  }
+
+  await db.from('loan_schedule').insert(
+    scheduleRows.map(row => ({
       loan_id: loan.id,
-      installment_number: 1,
-      due_date: maturityDate,
-      principal_due: amount_requested,
-      interest_due: totalRepayment - amount_requested,
-      total_due: totalRepayment,
+      installment_number: row.installment_number,
+      due_date: row.due_date,
+      principal_due: row.principal_due,
+      interest_due: row.interest_due,
+      total_due: row.total_due,
       principal_paid: 0,
       interest_paid: 0,
       total_paid: 0,
       late_fee: 0,
       status: 'upcoming',
       days_late: 0,
-    })
-  } else {
-    const amort = calculateAmortization(amount_requested, interest_rate, term_months, firstPaymentStr)
-    await db.from('loan_schedule').insert(
-      amort.schedule.map(row => ({
-        loan_id: loan.id,
-        installment_number: row.installment_number,
-        due_date: row.due_date,
-        principal_due: row.principal_due,
-        interest_due: row.interest_due,
-        total_due: row.total_due,
-        principal_paid: 0,
-        interest_paid: 0,
-        total_paid: 0,
-        late_fee: 0,
-        status: 'upcoming',
-        days_late: 0,
-      }))
-    )
-  }
+    }))
+  )
 
   res.status(201).json({ loan })
 })
