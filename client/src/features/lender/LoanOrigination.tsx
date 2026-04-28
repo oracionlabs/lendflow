@@ -6,6 +6,7 @@ import { formatCents } from '@/lib/utils'
 import { toast } from 'sonner'
 import { LOAN_PURPOSE_LABELS } from '@lendflow/shared'
 import { CheckCircle2, Upload, X, ArrowRight, ArrowLeft } from 'lucide-react'
+import { DatePicker } from '@/components/shared/DatePicker'
 
 const PURPOSES = Object.entries(LOAN_PURPOSE_LABELS)
 
@@ -227,7 +228,7 @@ export function LoanOrigination() {
   }
 
   const minDate = new Date()
-  minDate.setMonth(minDate.getMonth() + 1)
+  minDate.setDate(minDate.getDate() + 1)
 
   // Step validity
   const step1Valid = form.borrower_name.trim().length > 0
@@ -447,8 +448,12 @@ export function LoanOrigination() {
           {form.payment_type === 'lump_sum' && (
             <div>
               <Label>Due date <span className="text-destructive">*</span></Label>
-              <Input type="date" value={form.due_date} min={minDate.toISOString().split('T')[0]}
-                onChange={e => set('due_date', e.target.value)} />
+              <DatePicker
+                value={form.due_date}
+                onChange={v => set('due_date', v)}
+                min={minDate.toISOString().split('T')[0]}
+                placeholder="Select repayment date"
+              />
               {form.due_date && (
                 <p className="text-xs text-muted-foreground mt-1">{term} month{term !== 1 ? 's' : ''} from today</p>
               )}
