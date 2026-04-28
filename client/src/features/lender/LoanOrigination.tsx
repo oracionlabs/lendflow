@@ -98,6 +98,7 @@ export function LoanOrigination() {
   const navigate = useNavigate()
   const [step, setStep] = useState<Step>(1)
   const [form, setForm] = useState<Form>(INITIAL)
+  const [dueDateMode, setDueDateMode] = useState<'days' | 'date'>('days')
   const [receipt, setReceipt] = useState<File | null>(null)
   const [receiptPreview, setReceiptPreview] = useState<string | null>(null)
   const [done, setDone] = useState(false)
@@ -105,13 +106,15 @@ export function LoanOrigination() {
 
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm(f => ({ ...f, [k]: v }))
 
-  // For lump sum, derive due_date from lump_sum_days
+  // For lump sum, derive the final ISO due date from whichever mode is active
   const computedDueDate = useMemo(() => {
-    if (form.payment_type !== 'lump_sum' || !form.lump_sum_days) return form.due_date
+    if (form.payment_type !== 'lump_sum') return form.due_date
+    if (dueDateMode === 'date') return form.due_date
+    if (!form.lump_sum_days) return ''
     const d = new Date()
     d.setDate(d.getDate() + form.lump_sum_days)
     return d.toISOString().split('T')[0]
-  }, [form.payment_type, form.lump_sum_days, form.due_date])
+  }, [form.payment_type, dueDateMode, form.lump_sum_days, form.due_date])
 
   // Calculated amounts
   const term = useMemo(() => {
@@ -243,7 +246,7 @@ export function LoanOrigination() {
   const step2Valid = form.amount > 0 && form.interest_rate > 0 && (() => {
     switch (form.payment_type) {
       case 'installments':    return form.term_months > 0
-      case 'lump_sum':        return form.lump_sum_days > 0
+      case 'lump_sum':        return dueDateMode === 'days' ? form.lump_sum_days > 0 : !!form.due_date
       case 'interest_only':   return form.term_months > 0
       case 'daily_interest':  return form.max_term_days > 0
       case 'custom_schedule': return form.term_months > 0 && !!form.payment_frequency
@@ -452,21 +455,50 @@ export function LoanOrigination() {
           )}
 
           {form.payment_type === 'lump_sum' && (
-            <div>
-              <Label>Repay in (days) <span className="text-destructive">*</span></Label>
-              <div className="relative">
-                <Input
-                  type="number"
-                  value={form.lump_sum_days || ''}
-                  onChange={e => set('lump_sum_days', parseInt(e.target.value || '1'))}
-                  min={1}
-                  placeholder="30"
-                />
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>Due date <span className="text-destructive">*</span></Label>
+                <div className="flex rounded-lg border overflow-hidden text-xs font-medium">
+                  <button type="button" onClick={() => setDueDateMode('days')}
+                    className={`px-3 py-1.5 transition-colors ${dueDateMode === 'days' ? 'bg-primary text-white' : 'hover:bg-muted text-muted-foreground'}`}>
+                    Days
+                  </button>
+                  <button type="button" onClick={() => setDueDateMode('date')}
+                    className={`px-3 py-1.5 transition-colors border-l ${dueDateMode === 'date' ? 'bg-primary text-white' : 'hover:bg-muted text-muted-foreground'}`}>
+                    Date
+                  </button>
+                </div>
               </div>
-              {form.lump_sum_days > 0 && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  Due on <span className="font-medium text-foreground">{computedDueDate}</span>
-                </p>
+
+              {dueDateMode === 'days' ? (
+                <>
+                  <Input
+                    type="number"
+                    value={form.lump_sum_days || ''}
+                    onChange={e => set('lump_sum_days', parseInt(e.target.value || '1'))}
+                    min={1}
+                    placeholder="30"
+                  />
+                  {form.lump_sum_days > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      Due on <span className="font-medium text-foreground">{computedDueDate}</span>
+                    </p>
+                  )}
+                </>
+              ) : (
+                <>
+                  <DatePicker
+                    value={form.due_date}
+                    onChange={v => set('due_date', v)}
+                    min={minDate.toISOString().split('T')[0]}
+                    placeholder="Select repayment date"
+                  />
+                  {form.due_date && (
+                    <p className="text-xs text-muted-foreground">
+                      {daysBetween(new Date(), new Date(form.due_date + 'T00:00:00'))} days from today
+                    </p>
+                  )}
+                </>
               )}
             </div>
           )}
