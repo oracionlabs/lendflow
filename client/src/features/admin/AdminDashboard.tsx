@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import api from '@/lib/api'
-import { formatCents, formatDate, useCurrency } from '@/lib/utils'
+import { formatCents, formatDate, useCurrencySymbol } from '@/lib/utils'
 import { CardSkeleton } from '@/components/shared/LoadingSkeleton'
 import { AlertTriangle, Clock, TrendingUp, TrendingDown, Download, FileText, RefreshCw, CheckCircle2 } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts'
@@ -68,7 +68,7 @@ const NOTIFICATION_ICONS: Record<string, { icon: typeof FileText; color: string;
 }
 
 export function AdminDashboard() {
-  useCurrency() // subscribe to currency changes
+  const symbol = useCurrencySymbol()
   const { data, isLoading } = useQuery({
     queryKey: ['admin-dashboard'],
     queryFn: async () => {
@@ -230,7 +230,7 @@ export function AdminDashboard() {
                 <BarChart data={origination} barSize={28}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(138 12% 91%)" vertical={false} />
                   <XAxis dataKey="month" tick={{ fontSize: 11, fill: 'hsl(220 8% 48%)' }} axisLine={false} tickLine={false} />
-                  <YAxis tickFormatter={v => `$${(v / 100000).toFixed(0)}k`} tick={{ fontSize: 11, fill: 'hsl(220 8% 48%)' }} axisLine={false} tickLine={false} />
+                  <YAxis tickFormatter={v => `${symbol}${(v / 100000).toFixed(0)}k`} tick={{ fontSize: 11, fill: 'hsl(220 8% 48%)' }} axisLine={false} tickLine={false} />
                   <Tooltip
                     formatter={(v: unknown) => formatCents(v as number)}
                     contentStyle={{ borderRadius: '8px', border: '1px solid hsl(138 12% 88%)', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}

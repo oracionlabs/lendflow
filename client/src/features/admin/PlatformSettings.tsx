@@ -2,10 +2,12 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import api from '@/lib/api'
 import { toast } from 'sonner'
+import { formatCents, useCurrency } from '@/lib/utils'
 import type { PlatformSettings } from '@lendflow/shared'
 import { LoadingSkeleton } from '@/components/shared/LoadingSkeleton'
 
 export function PlatformSettings() {
+  useCurrency() // subscribe to currency changes
   const qc = useQueryClient()
   const [editing, setEditing] = useState(false)
   const [form, setForm] = useState<Partial<PlatformSettings>>({})
@@ -185,7 +187,7 @@ export function PlatformSettings() {
             <h2 className="font-semibold">Fees & Rules</h2>
             {[
               { label: 'Origination Fee', value: `${((settings?.origination_fee_percent ?? 0) * 100).toFixed(2)}%` },
-              { label: 'Late Fee (flat)', value: `$${((settings?.late_fee_flat ?? 0) / 100).toFixed(2)}` },
+              { label: 'Late Fee (flat)', value: formatCents(settings?.late_fee_flat ?? 0) },
               { label: 'Grace Period', value: `${settings?.grace_period_days} days` },
               { label: 'Default Threshold', value: `${settings?.default_threshold_missed} missed payments` },
             ].map(({ label, value }) => (
@@ -198,9 +200,9 @@ export function PlatformSettings() {
           <section className="space-y-3">
             <h2 className="font-semibold">Loan Limits</h2>
             {[
-              { label: 'Min Loan', value: `$${((settings?.min_loan_amount ?? 0) / 100).toLocaleString()}` },
-              { label: 'Max Loan', value: `$${((settings?.max_loan_amount ?? 0) / 100).toLocaleString()}` },
-              { label: 'Min Commitment', value: `$${((settings?.min_commitment_amount ?? 0) / 100).toLocaleString()}` },
+              { label: 'Min Loan', value: formatCents(settings?.min_loan_amount ?? 0) },
+              { label: 'Max Loan', value: formatCents(settings?.max_loan_amount ?? 0) },
+              { label: 'Min Commitment', value: formatCents(settings?.min_commitment_amount ?? 0) },
             ].map(({ label, value }) => (
               <div key={label} className="flex gap-4 py-2 border-b last:border-0">
                 <span className="w-48 text-muted-foreground">{label}</span>

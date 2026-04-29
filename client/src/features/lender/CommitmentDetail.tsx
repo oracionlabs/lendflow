@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router-dom'
 import { useState } from 'react'
 import api from '@/lib/api'
 import { toast } from 'sonner'
-import { formatCents, formatDate, formatPercent } from '@/lib/utils'
+import { formatCents, formatDate, formatPercent, getCurrencySymbol } from '@/lib/utils'
 import { CreditGradeBadge } from '@/components/shared/CreditGradeBadge'
 import { CardSkeleton } from '@/components/shared/LoadingSkeleton'
 import { LOAN_PURPOSE_LABELS } from '@lendflow/shared'
@@ -110,6 +110,7 @@ export function CommitmentDetail() {
   const loan = commitment.loans
   const cur = loan.currency
   const fmt = (cents: number): string => formatCents(cents, cur)
+  const loanSymbol = getCurrencySymbol(cur ?? 'USD')
   const grade = loan.admin_override_grade ?? loan.ai_credit_grade
   const yieldProgress = commitment.expected_yield > 0
     ? (commitment.actual_yield / commitment.expected_yield) * 100
@@ -273,7 +274,7 @@ export function CommitmentDetail() {
             <BarChart data={chartData} barSize={16}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(138 12% 91%)" vertical={false} />
               <XAxis dataKey="month" tick={{ fontSize: 10, fill: 'hsl(220 8% 48%)' }} axisLine={false} tickLine={false} />
-              <YAxis tickFormatter={v => `$${(v / 100).toFixed(0)}`} tick={{ fontSize: 10, fill: 'hsl(220 8% 48%)' }} axisLine={false} tickLine={false} width={40} />
+              <YAxis tickFormatter={v => `${loanSymbol}${(v / 100).toFixed(0)}`} tick={{ fontSize: 10, fill: 'hsl(220 8% 48%)' }} axisLine={false} tickLine={false} width={40} />
               <Tooltip formatter={(v: unknown) => fmt(v as number)} />
               <Bar dataKey="interest" name="Interest" fill="hsl(142 52% 38%)" radius={[3, 3, 0, 0]} stackId="a" />
               <Bar dataKey="principal" name="Principal" fill="hsl(142 52% 70%)" radius={[3, 3, 0, 0]} stackId="a" />

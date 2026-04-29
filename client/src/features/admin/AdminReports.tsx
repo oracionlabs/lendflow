@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import api from '@/lib/api'
-import { formatCents, useCurrency } from '@/lib/utils'
+import { formatCents, useCurrencySymbol } from '@/lib/utils'
 import { CardSkeleton } from '@/components/shared/LoadingSkeleton'
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -18,7 +18,7 @@ const GRADE_COLORS: Record<string, string> = {
 }
 
 export function AdminReports() {
-  useCurrency() // subscribe to currency changes
+  const symbol = useCurrencySymbol()
   const { data: origination, isLoading: origLoading } = useQuery({
     queryKey: ['admin-origination'],
     queryFn: async () => {
@@ -123,7 +123,7 @@ export function AdminReports() {
               <BarChart data={origination}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                 <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-                <YAxis yAxisId="left" tickFormatter={v => `$${(v / 100000).toFixed(0)}k`} tick={{ fontSize: 11 }} />
+                <YAxis yAxisId="left" tickFormatter={v => `${symbol}${(v / 100000).toFixed(0)}k`} tick={{ fontSize: 11 }} />
                 <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} />
                 <Tooltip formatter={(v: unknown, name: unknown) => name === 'Volume' ? formatCents(v as number) : (v as number)} />
                 <Legend />
@@ -193,7 +193,7 @@ export function AdminReports() {
               <LineChart data={revenue}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                 <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-                <YAxis tickFormatter={v => `$${(v / 100).toFixed(0)}`} tick={{ fontSize: 11 }} />
+                <YAxis tickFormatter={v => `${symbol}${(v / 100).toFixed(0)}`} tick={{ fontSize: 11 }} />
                 <Tooltip formatter={(v: unknown) => formatCents(v as number)} />
                 <Legend />
                 <Line type="monotone" dataKey="fees" name="Monthly Fees" stroke="#3b82f6" strokeWidth={2} dot={false} />

@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import api from '@/lib/api'
-import { formatCents, formatDate, useCurrency } from '@/lib/utils'
+import { formatCents, formatDate, useCurrencySymbol } from '@/lib/utils'
 import { CardSkeleton } from '@/components/shared/LoadingSkeleton'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { TrendingUp, Download } from 'lucide-react'
@@ -24,7 +24,7 @@ interface IncomeRow {
 }
 
 export function LenderReports() {
-  useCurrency() // subscribe to currency changes
+  const symbol = useCurrencySymbol()
   const currentYear = new Date().getFullYear()
   const [selectedYear, setSelectedYear] = useState(String(currentYear))
 
@@ -149,7 +149,7 @@ export function LenderReports() {
               <BarChart data={yieldChart}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                 <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-                <YAxis tickFormatter={v => `$${(v / 100).toFixed(0)}`} tick={{ fontSize: 11 }} />
+                <YAxis tickFormatter={v => `${symbol}${(v / 100).toFixed(0)}`} tick={{ fontSize: 11 }} />
                 <Tooltip formatter={(v: unknown) => formatCents(v as number)} />
                 <Legend />
                 <Bar dataKey="amount" name="Monthly Yield" fill="#10b981" radius={[2, 2, 0, 0]} />
@@ -174,7 +174,7 @@ export function LenderReports() {
               <LineChart data={yieldChart}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                 <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-                <YAxis tickFormatter={v => `$${(v / 100).toFixed(0)}`} tick={{ fontSize: 11 }} />
+                <YAxis tickFormatter={v => `${symbol}${(v / 100).toFixed(0)}`} tick={{ fontSize: 11 }} />
                 <Tooltip formatter={(v: unknown) => formatCents(v as number)} />
                 <Line type="monotone" dataKey="cumulative" stroke="#3b82f6" strokeWidth={2} dot={false} name="Cumulative" />
               </LineChart>
