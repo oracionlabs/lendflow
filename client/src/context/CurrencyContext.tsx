@@ -7,8 +7,8 @@ export function CurrencyLoader() {
   const { data } = useQuery({
     queryKey: ['platform-settings-public'],
     queryFn: async () => {
-      const { data } = await api.get<{ settings: { currency: string } }>('/api/admin/settings')
-      return data.settings
+      const { data } = await api.get<{ currency: string }>('/api/users/platform-settings')
+      return data
     },
     staleTime: 60_000,
     retry: false,

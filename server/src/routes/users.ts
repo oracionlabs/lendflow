@@ -23,4 +23,11 @@ router.put('/me', async (req: Request, res: Response): Promise<void> => {
   res.json({ user: data })
 })
 
+// Public platform settings — safe fields accessible to all authenticated users
+router.get('/platform-settings', async (_req, res: Response): Promise<void> => {
+  const db = supabaseAdmin()
+  const { data } = await db.from('platform_settings').select('currency').single()
+  res.json({ currency: data?.currency ?? 'USD' })
+})
+
 export default router

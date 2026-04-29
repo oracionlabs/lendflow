@@ -22,7 +22,7 @@ export function PlatformSettings() {
     mutationFn: (updates: Partial<PlatformSettings>) => api.put('/api/admin/settings', updates),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['platform-settings'] })
-      qc.invalidateQueries({ queryKey: ['platform-settings-currency'] })
+      qc.invalidateQueries({ queryKey: ['platform-settings-public'] })
       setEditing(false)
       toast.success('Settings updated. Changes apply to new loans only.')
     },
