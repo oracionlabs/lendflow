@@ -24,6 +24,16 @@ export function useCurrency(): string {
   )
 }
 
+export function getCurrencySymbol(currency: string): string {
+  const parts = new Intl.NumberFormat(undefined, { style: 'currency', currency }).formatToParts(0)
+  return parts.find(p => p.type === 'currency')?.value ?? currency
+}
+
+export function useCurrencySymbol(): string {
+  const currency = useCurrency()
+  return getCurrencySymbol(currency)
+}
+
 export function formatCents(cents: number, currency?: string): string {
   return new Intl.NumberFormat(undefined, {
     style: 'currency',

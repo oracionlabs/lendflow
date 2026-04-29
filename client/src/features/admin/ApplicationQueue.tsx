@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import api from '@/lib/api'
-import { formatCents, formatDate, formatPercent, useCurrency } from '@/lib/utils'
+import { formatCents, formatDate, formatPercent, useCurrencySymbol } from '@/lib/utils'
 import { CreditGradeBadge } from '@/components/shared/CreditGradeBadge'
 import { TableSkeleton } from '@/components/shared/LoadingSkeleton'
 import { EmptyState } from '@/components/shared/EmptyState'
@@ -30,7 +30,7 @@ interface QueueItem {
 }
 
 export function ApplicationQueue() {
-  useCurrency() // subscribe to currency changes
+  const symbol = useCurrencySymbol()
   const qc = useQueryClient()
   const [selected, setSelected] = useState<QueueItem | null>(null)
   const [action, setAction] = useState<'approve' | 'reject' | null>(null)
@@ -183,7 +183,7 @@ export function ApplicationQueue() {
                   <div>
                     <label className="block text-sm font-medium mb-1.5">Approved Amount</label>
                     <div className="relative">
-                      <span className="absolute left-3 top-2.5 text-muted-foreground text-sm">$</span>
+                      <span className="absolute left-3 top-2.5 text-muted-foreground text-sm">{symbol}</span>
                       <input type="number" value={approvedAmount / 100}
                         onChange={e => setApprovedAmount(Math.round(parseFloat(e.target.value) * 100))}
                         className="w-full rounded-md border bg-background pl-7 pr-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" />

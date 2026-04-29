@@ -2,7 +2,7 @@ import { useQuery, useMutation } from '@tanstack/react-query'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useState } from 'react'
 import api from '@/lib/api'
-import { formatCents, useCurrency } from '@/lib/utils'
+import { formatCents, useCurrencySymbol } from '@/lib/utils'
 import { toast } from 'sonner'
 import {
   LOAN_PURPOSE_LABELS,
@@ -31,7 +31,7 @@ interface Listing {
 }
 
 export function ListingDetail() {
-  useCurrency() // subscribe to currency changes
+  const symbol = useCurrencySymbol()
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const [applied, setApplied] = useState(false)
@@ -229,7 +229,7 @@ export function ListingDetail() {
         <div>
           <label className="block text-sm font-medium mb-1.5">How much do you need?</label>
           <div className="relative">
-            <span className="absolute left-3 top-3 text-muted-foreground text-sm">$</span>
+            <span className="absolute left-3 top-3 text-muted-foreground text-sm">{symbol}</span>
             <input type="number" value={amountDollars || ''}
               onChange={e => setForm(f => ({ ...f, amount_requested: Math.round(parseFloat(e.target.value || '0') * 100) }))}
               placeholder={`${effectiveMinLoan / 100} – ${(effectiveMaxLoan ?? listing.available_amount) / 100}`}

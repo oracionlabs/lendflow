@@ -2,7 +2,7 @@ import { useState, useMemo, useRef } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import api from '@/lib/api'
-import { formatCents, useCurrency } from '@/lib/utils'
+import { formatCents, useCurrencySymbol } from '@/lib/utils'
 import { toast } from 'sonner'
 import { LOAN_PURPOSE_LABELS, CURRENCIES } from '@lendflow/shared'
 import { CheckCircle2, Upload, X, ArrowRight, ArrowLeft } from 'lucide-react'
@@ -97,7 +97,7 @@ function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
 }
 
 export function LoanOrigination() {
-  useCurrency() // subscribe to currency changes
+  const symbol = useCurrencySymbol()
   const navigate = useNavigate()
   const [step, setStep] = useState<Step>(1)
   const [form, setForm] = useState<Form>(INITIAL)
@@ -359,7 +359,7 @@ export function LoanOrigination() {
           <div>
             <Label>Amount <span className="text-destructive">*</span></Label>
             <div className="relative">
-              <span className="absolute left-3 top-2.5 text-muted-foreground text-sm">$</span>
+              <span className="absolute left-3 top-2.5 text-muted-foreground text-sm">{symbol}</span>
               <input
                 type="number"
                 value={form.amount / 100}

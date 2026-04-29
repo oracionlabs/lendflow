@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState, useEffect } from 'react'
 import api from '@/lib/api'
-import { formatCents, useCurrency } from '@/lib/utils'
+import { formatCents, useCurrency, useCurrencySymbol } from '@/lib/utils'
 import { toast } from 'sonner'
 import {
   LOAN_PURPOSE_LABELS,
@@ -61,7 +61,7 @@ const EMPTY_PKG: Omit<LoanPackage, 'id' | 'listing_id' | 'created_at' | 'updated
 }
 
 export function MyListing() {
-  useCurrency() // subscribe to currency changes
+  const symbol = useCurrencySymbol()
   const qc = useQueryClient()
   const [form, setForm] = useState(EMPTY)
   const [loaded, setLoaded] = useState(false)
@@ -225,7 +225,7 @@ export function MyListing() {
         <div>
           <label className="block text-sm font-medium mb-1.5">Available to lend</label>
           <div className="relative">
-            <span className="absolute left-3 top-3 text-muted-foreground text-sm">$</span>
+            <span className="absolute left-3 top-3 text-muted-foreground text-sm">{symbol}</span>
             <input type="number" value={form.available_amount / 100 || ''}
               onChange={e => set('available_amount', Math.round(parseFloat(e.target.value || '0') * 100))}
               placeholder="50,000"
@@ -237,7 +237,7 @@ export function MyListing() {
             <div key={key}>
               <label className="block text-sm font-medium mb-1.5">{label}</label>
               <div className="relative">
-                <span className="absolute left-3 top-3 text-muted-foreground text-sm">$</span>
+                <span className="absolute left-3 top-3 text-muted-foreground text-sm">{symbol}</span>
                 <input type="number" value={form[key] / 100 || ''}
                   onChange={e => set(key, Math.round(parseFloat(e.target.value || '0') * 100))}
                   placeholder={placeholder}

@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams } from 'react-router-dom'
 import { useState } from 'react'
 import api from '@/lib/api'
-import { formatCents, formatDate, formatPercent } from '@/lib/utils'
+import { formatCents, formatDate, formatPercent, useCurrencySymbol } from '@/lib/utils'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { CreditGradeBadge } from '@/components/shared/CreditGradeBadge'
 import { TableSkeleton } from '@/components/shared/LoadingSkeleton'
@@ -28,6 +28,7 @@ function ScheduleStatusIcon({ status }: { status: string }) {
 }
 
 export function ActiveLoanDetail() {
+  const symbol = useCurrencySymbol()
   const { id } = useParams<{ id: string }>()
   const qc = useQueryClient()
   const [payAmount, setPayAmount] = useState<number | null>(null)
@@ -248,7 +249,7 @@ export function ActiveLoanDetail() {
 
                 {payMode === 'custom' && (
                   <div className="relative">
-                    <span className="absolute left-3 top-2.5 text-muted-foreground text-sm">$</span>
+                    <span className="absolute left-3 top-2.5 text-muted-foreground text-sm">{symbol}</span>
                     <input
                       type="number"
                       value={payAmount ? payAmount / 100 : ''}
