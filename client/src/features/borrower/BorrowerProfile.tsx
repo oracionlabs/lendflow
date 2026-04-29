@@ -5,11 +5,12 @@ import api from '@/lib/api'
 import { useAuth } from '@/context/AuthContext'
 import { toast } from 'sonner'
 import type { BorrowerProfile } from '@lendflow/shared'
-import { formatCents } from '@/lib/utils'
+import { formatCents, useCurrency } from '@/lib/utils'
 import { LoadingSkeleton } from '@/components/shared/LoadingSkeleton'
 import { BarChart2, ChevronRight } from 'lucide-react'
 
 export function BorrowerProfilePage() {
+  useCurrency() // subscribe to currency changes
   const { user } = useAuth()
   const qc = useQueryClient()
 

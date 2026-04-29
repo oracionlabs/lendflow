@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import api from '@/lib/api'
-import { formatCents } from '@/lib/utils'
+import { formatCents, useCurrency } from '@/lib/utils'
 import { CardSkeleton } from '@/components/shared/LoadingSkeleton'
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -18,6 +18,7 @@ const GRADE_COLORS: Record<string, string> = {
 }
 
 export function AdminReports() {
+  useCurrency() // subscribe to currency changes
   const { data: origination, isLoading: origLoading } = useQuery({
     queryKey: ['admin-origination'],
     queryFn: async () => {

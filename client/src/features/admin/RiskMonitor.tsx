@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import api from '@/lib/api'
-import { formatCents } from '@/lib/utils'
+import { formatCents, useCurrency } from '@/lib/utils'
 import { TableSkeleton } from '@/components/shared/LoadingSkeleton'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { Shield } from 'lucide-react'
@@ -24,6 +24,7 @@ interface RiskData {
 }
 
 export function RiskMonitor() {
+  useCurrency() // subscribe to currency changes
   const { data, isLoading } = useQuery({
     queryKey: ['risk-monitor'],
     queryFn: async () => {

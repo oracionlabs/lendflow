@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import api from '@/lib/api'
-import { formatCents, formatDate } from '@/lib/utils'
+import { formatCents, formatDate, useCurrency } from '@/lib/utils'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { CreditGradeBadge } from '@/components/shared/CreditGradeBadge'
 import { TableSkeleton } from '@/components/shared/LoadingSkeleton'
@@ -12,6 +12,7 @@ import type { Loan } from '@lendflow/shared'
 type LoanWithUser = Loan & { users?: { name: string; email: string } }
 
 export function LoanManagement() {
+  useCurrency() // subscribe to currency changes
   const qc = useQueryClient()
   const [statusFilter, setStatusFilter] = useState('')
   const [disburseId, setDisburseId] = useState<string | null>(null)

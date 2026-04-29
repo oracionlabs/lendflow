@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import api from '@/lib/api'
 import { useAuth } from '@/context/AuthContext'
-import { formatCents, formatPercent } from '@/lib/utils'
+import { formatCents, formatPercent, useCurrency } from '@/lib/utils'
 import { CardSkeleton } from '@/components/shared/LoadingSkeleton'
 import { CreditGradeBadge } from '@/components/shared/CreditGradeBadge'
 import { LOAN_PURPOSE_LABELS } from '@lendflow/shared'
@@ -31,6 +31,7 @@ interface CommitmentWithLoan extends FundingCommitment {
 interface LoanRequest { id: string; amount_requested: number; purpose: string; status: string; users: { name: string } | null }
 
 export function PortfolioDashboard() {
+  useCurrency() // subscribe to currency changes
   const { user } = useAuth()
 
   const { data: summary, isLoading } = useQuery({

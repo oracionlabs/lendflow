@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import api from '@/lib/api'
-import { formatCents, formatDate, formatPercent } from '@/lib/utils'
+import { formatCents, formatDate, formatPercent, useCurrency } from '@/lib/utils'
 import { CreditGradeBadge } from '@/components/shared/CreditGradeBadge'
 import { TableSkeleton } from '@/components/shared/LoadingSkeleton'
 import { EmptyState } from '@/components/shared/EmptyState'
@@ -30,6 +30,7 @@ interface QueueItem {
 }
 
 export function ApplicationQueue() {
+  useCurrency() // subscribe to currency changes
   const qc = useQueryClient()
   const [selected, setSelected] = useState<QueueItem | null>(null)
   const [action, setAction] = useState<'approve' | 'reject' | null>(null)

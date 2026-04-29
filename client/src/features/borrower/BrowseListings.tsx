@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { useState } from 'react'
 import api from '@/lib/api'
-import { formatCents } from '@/lib/utils'
+import { formatCents, useCurrency } from '@/lib/utils'
 import { Search, SlidersHorizontal, ChevronRight } from 'lucide-react'
 import { LOAN_PURPOSE_LABELS } from '@lendflow/shared'
 import { CardSkeleton } from '@/components/shared/LoadingSkeleton'
@@ -31,6 +31,7 @@ interface Listing {
 const AVATAR_COLORS = ['bg-emerald-100 text-emerald-700', 'bg-blue-100 text-blue-700', 'bg-amber-100 text-amber-700', 'bg-purple-100 text-purple-700', 'bg-teal-100 text-teal-700']
 
 export function BrowseListings() {
+  useCurrency() // subscribe to currency changes
   const [search, setSearch] = useState('')
   const [showFilters, setShowFilters] = useState(false)
 

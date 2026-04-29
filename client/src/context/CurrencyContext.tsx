@@ -10,7 +10,7 @@ export function CurrencyLoader() {
       const { data } = await api.get<{ settings: { currency: string } }>('/api/admin/settings')
       return data.settings
     },
-    staleTime: Infinity,
+    staleTime: 60_000,
     retry: false,
   })
 

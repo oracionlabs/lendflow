@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import api from '@/lib/api'
-import { formatCents, formatPercent, formatDate } from '@/lib/utils'
+import { formatCents, formatPercent, formatDate, useCurrency } from '@/lib/utils'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { CardSkeleton } from '@/components/shared/LoadingSkeleton'
 import { LOAN_PURPOSE_LABELS } from '@lendflow/shared'
@@ -18,6 +18,7 @@ interface CommitmentWithLoan extends FundingCommitment {
 }
 
 export function LenderLoans() {
+  useCurrency() // subscribe to currency changes
   const { data: commitments, isLoading } = useQuery({
     queryKey: ['lender-commitments'],
     queryFn: async () => {

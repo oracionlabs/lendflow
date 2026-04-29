@@ -4,12 +4,13 @@ import api from '@/lib/api'
 import { useAuth } from '@/context/AuthContext'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { EmptyState } from '@/components/shared/EmptyState'
-import { formatCents, formatDate, daysUntil } from '@/lib/utils'
+import { formatCents, formatDate, daysUntil, useCurrency } from '@/lib/utils'
 import { LOAN_PURPOSE_LABELS } from '@lendflow/shared'
 import type { Loan } from '@lendflow/shared'
 import { Search, ArrowRight, Clock, ChevronRight } from 'lucide-react'
 
 export function BorrowerDashboard() {
+  useCurrency() // subscribe to currency changes
   const { user } = useAuth()
 
   const { data: loans, isLoading } = useQuery({

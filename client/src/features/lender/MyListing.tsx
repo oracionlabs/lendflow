@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState, useEffect } from 'react'
 import api from '@/lib/api'
-import { formatCents } from '@/lib/utils'
+import { formatCents, useCurrency } from '@/lib/utils'
 import { toast } from 'sonner'
 import {
   LOAN_PURPOSE_LABELS,
@@ -61,6 +61,7 @@ const EMPTY_PKG: Omit<LoanPackage, 'id' | 'listing_id' | 'created_at' | 'updated
 }
 
 export function MyListing() {
+  useCurrency() // subscribe to currency changes
   const qc = useQueryClient()
   const [form, setForm] = useState(EMPTY)
   const [loaded, setLoaded] = useState(false)

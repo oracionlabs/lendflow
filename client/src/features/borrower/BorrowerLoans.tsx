@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import api from '@/lib/api'
-import { formatCents, formatDate } from '@/lib/utils'
+import { formatCents, formatDate, useCurrency } from '@/lib/utils'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { CardSkeleton } from '@/components/shared/LoadingSkeleton'
 import { LOAN_PURPOSE_LABELS } from '@lendflow/shared'
@@ -44,6 +44,7 @@ function Section({ title, loans }: { title: string; loans: Loan[] }) {
 }
 
 export function BorrowerLoans() {
+  useCurrency() // subscribe to currency changes
   const { data: loans, isLoading } = useQuery({
     queryKey: ['borrower-loans'],
     queryFn: async () => {

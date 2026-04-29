@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import api from '@/lib/api'
-import { formatCents, formatDate } from '@/lib/utils'
+import { formatCents, formatDate, useCurrency } from '@/lib/utils'
 import { CardSkeleton } from '@/components/shared/LoadingSkeleton'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { TrendingUp, Download } from 'lucide-react'
@@ -24,6 +24,7 @@ interface IncomeRow {
 }
 
 export function LenderReports() {
+  useCurrency() // subscribe to currency changes
   const currentYear = new Date().getFullYear()
   const [selectedYear, setSelectedYear] = useState(String(currentYear))
 

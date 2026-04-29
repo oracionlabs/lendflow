@@ -2,7 +2,7 @@ import { useQuery, useMutation } from '@tanstack/react-query'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useState } from 'react'
 import api from '@/lib/api'
-import { formatCents } from '@/lib/utils'
+import { formatCents, useCurrency } from '@/lib/utils'
 import { toast } from 'sonner'
 import {
   LOAN_PURPOSE_LABELS,
@@ -31,6 +31,7 @@ interface Listing {
 }
 
 export function ListingDetail() {
+  useCurrency() // subscribe to currency changes
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const [applied, setApplied] = useState(false)

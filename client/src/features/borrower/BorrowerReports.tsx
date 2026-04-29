@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import api from '@/lib/api'
-import { formatCents, formatDate, formatPercent } from '@/lib/utils'
+import { formatCents, formatDate, formatPercent, useCurrency } from '@/lib/utils'
 import { CardSkeleton } from '@/components/shared/LoadingSkeleton'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { FileText, Download } from 'lucide-react'
@@ -22,6 +22,7 @@ interface ReportSummary {
 }
 
 export function BorrowerReports() {
+  useCurrency() // subscribe to currency changes
   const { data: loans, isLoading } = useQuery({
     queryKey: ['borrower-report-loans'],
     queryFn: async () => {

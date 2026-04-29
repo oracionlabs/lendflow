@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import api from '@/lib/api'
-import { formatCents, formatDate } from '@/lib/utils'
+import { formatCents, formatDate, useCurrency } from '@/lib/utils'
 import { CardSkeleton } from '@/components/shared/LoadingSkeleton'
 import { AlertTriangle, Clock, TrendingUp, TrendingDown, Download, FileText, RefreshCw, CheckCircle2 } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts'
@@ -68,6 +68,7 @@ const NOTIFICATION_ICONS: Record<string, { icon: typeof FileText; color: string;
 }
 
 export function AdminDashboard() {
+  useCurrency() // subscribe to currency changes
   const { data, isLoading } = useQuery({
     queryKey: ['admin-dashboard'],
     queryFn: async () => {

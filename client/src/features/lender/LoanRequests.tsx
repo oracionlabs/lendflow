@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import api from '@/lib/api'
-import { formatCents, formatDate } from '@/lib/utils'
+import { formatCents, formatDate, useCurrency } from '@/lib/utils'
 import { toast } from 'sonner'
 import { LOAN_PURPOSE_LABELS } from '@lendflow/shared'
 import { EmptyState } from '@/components/shared/EmptyState'
@@ -26,6 +26,7 @@ const STATUS_STYLES: Record<string, string> = {
 }
 
 export function LoanRequests() {
+  useCurrency() // subscribe to currency changes
   const qc = useQueryClient()
   const [expanded, setExpanded] = useState<string | null>(null)
   const [rejectReason, setRejectReason] = useState('')
