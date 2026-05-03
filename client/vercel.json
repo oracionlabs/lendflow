@@ -1,0 +1,7 @@
+{
+  "framework": null,
+  "installCommand": "pnpm install",
+  "buildCommand": "REPO=$(git rev-parse --show-toplevel) && (cd $REPO/shared && pnpm run build) && pnpm run build",
+  "outputDirectory": "dist",
+  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+}
