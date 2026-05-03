@@ -8,6 +8,7 @@ import { requireAuth } from './middleware/auth'
 import { requireBorrower, requireLender, requireAdmin } from './middleware/requireRole'
 import { errorHandler } from './middleware/errorHandler'
 
+import { supabaseAdmin } from './lib/supabase'
 import authRouter from './routes/auth'
 import usersRouter from './routes/users'
 import borrowerRouter from './routes/borrower'
@@ -35,6 +36,12 @@ export function createApp() {
   app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'))
 
   app.get('/health', (_req, res) => res.json({ ok: true, service: 'lendflow-api' }))
+
+  app.get('/api/platform-currency', async (_req, res: Response) => {
+    const db = supabaseAdmin()
+    const { data } = await db.from('platform_settings').select('currency').single()
+    res.json({ currency: data?.currency ?? 'USD' })
+  })
 
   app.use('/api/auth', authRouter)
 

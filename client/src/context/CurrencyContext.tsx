@@ -7,11 +7,10 @@ export function CurrencyLoader() {
   const { data } = useQuery({
     queryKey: ['platform-settings-public'],
     queryFn: async () => {
-      const { data } = await api.get<{ currency: string }>('/api/users/platform-settings')
+      const { data } = await api.get<{ currency: string }>('/api/platform-currency')
       return data
     },
     staleTime: 60_000,
-    retry: false,
   })
 
   useEffect(() => {
