@@ -8,12 +8,15 @@ export function cn(...inputs: ClassValue[]) {
 
 // ─── Reactive currency store ─────────────────────────────────────────────────
 
-let _currency = 'USD'
+let _currency: string = (() => {
+  try { return localStorage.getItem('platform-currency') ?? 'USD' } catch { return 'USD' }
+})()
 const _listeners = new Set<() => void>()
 
 export function setCurrency(currency: string) {
   if (_currency === currency) return
   _currency = currency
+  try { localStorage.setItem('platform-currency', currency) } catch { /* ignore */ }
   _listeners.forEach(l => l())
 }
 
