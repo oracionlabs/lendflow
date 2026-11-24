@@ -11,6 +11,7 @@ import { ArrowLeft, TrendingUp, XCircle } from 'lucide-react'
 import { QrImage } from '@/components/shared/QrImage'
 import type { LoanScheduleItem } from '@lendflow/shared'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import { expectedFullPayment, PaidInFullDialog } from './PaidInFullDialog'
 
 const CANCEL_REASONS = [
   'Borrower requested cancellation',
@@ -70,6 +71,7 @@ export function CommitmentDetail() {
   const [showCancel, setShowCancel] = useState(false)
   const [partialAmount, setPartialAmount] = useState('')
   const [extendDate, setExtendDate] = useState('')
+  const [confirmFull, setConfirmFull] = useState(false)
   const [cancelReason, setCancelReason] = useState(CANCEL_REASONS[0])
   const [cancelOther, setCancelOther] = useState('')
 
@@ -110,6 +112,7 @@ export function CommitmentDetail() {
       qc.invalidateQueries({ queryKey: ['commitment-yields', id] })
       qc.invalidateQueries({ queryKey: ['lender-commitments'] })
       setPartialAmount('')
+      setConfirmFull(false)
       const saved = (res.data as { interest_saved?: number }).interest_saved ?? 0
       toast.success(saved > 0 ? 'Advance payment recorded. Interest was recalculated.' : 'Payment recorded')
     },
@@ -187,6 +190,7 @@ export function CommitmentDetail() {
     return acc
   }, {})
   const chartData = Object.values(monthlyYields)
+  const fullQuote = expectedFullPayment(schedule ?? [])
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 pb-8">
@@ -329,7 +333,7 @@ export function CommitmentDetail() {
             <button
               type="button"
               disabled={markPaid.isPending || schedule.every(row => row.status === 'paid' || row.status === 'waived')}
-              onClick={() => markPaid.mutate({ mode: 'full' })}
+              onClick={() => setConfirmFull(true)}
               className="min-h-11 shrink-0 rounded-lg bg-emerald-600 px-3 text-xs font-semibold text-white disabled:opacity-50"
             >
               Paid in full
@@ -449,6 +453,16 @@ export function CommitmentDetail() {
               </div>
             )
           })}
+          <PaidInFullDialog
+            open={confirmFull}
+            currency={loan.currency}
+            expected={fullQuote.expected}
+            principal={fullQuote.principal}
+            interest={fullQuote.interest}
+            pending={markPaid.isPending}
+            onCancel={() => setConfirmFull(false)}
+            onConfirm={() => markPaid.mutate({ mode: 'full' })}
+          />
         </section>
       )}
 

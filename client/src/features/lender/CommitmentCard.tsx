@@ -8,6 +8,7 @@ import { StatusBadge } from '@/components/shared/StatusBadge'
 import { LOAN_PURPOSE_LABELS, quoteAdvance } from '@lendflow/shared'
 import type { LoanPurpose, LoanStatus } from '@lendflow/shared'
 import { ChevronRight } from 'lucide-react'
+import { expectedFullPayment, PaidInFullDialog } from './PaidInFullDialog'
 
 interface ScheduleRow {
   installment_number: number
@@ -119,12 +120,14 @@ function PayControls({
   currency?: string
 }) {
   const [amount, setAmount] = useState('')
+  const [confirmFull, setConfirmFull] = useState(false)
   const qc = useQueryClient()
   const pay = useMutation({
     mutationFn: (body: { mode: 'partial' | 'full' | 'advance'; amount?: number }) =>
       api.post(`/api/lender/loans/${loanId}/instapay-payment`, body),
     onSuccess: (res) => {
       setAmount('')
+      setConfirmFull(false)
       qc.invalidateQueries({ queryKey: ['lender-commitments'] })
       const saved = (res.data as { interest_saved?: number }).interest_saved ?? 0
       toast.success(saved > 0 ? 'Advance payment recorded. Interest was recalculated.' : 'Payment recorded')
@@ -135,6 +138,7 @@ function PayControls({
     },
   })
 
+  const full = expectedFullPayment(schedule)
   const advance = quoteAdvance(schedule.map(row => ({
     ...row,
     principal_due: row.principal_due ?? 0,
@@ -180,12 +184,22 @@ function PayControls({
       <button
         type="button"
         disabled={pay.isPending}
-        onClick={() => pay.mutate({ mode: 'full' })}
+        onClick={() => setConfirmFull(true)}
         className="min-h-11 rounded-xl bg-primary px-3 text-sm font-semibold text-primary-foreground disabled:opacity-50"
       >
         Paid in full
       </button>
     </div>
+    <PaidInFullDialog
+      open={confirmFull}
+      currency={currency}
+      expected={full.expected}
+      principal={full.principal}
+      interest={full.interest}
+      pending={pay.isPending}
+      onCancel={() => setConfirmFull(false)}
+      onConfirm={() => pay.mutate({ mode: 'full' })}
+    />
     </div>
   )
 }
