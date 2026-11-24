@@ -5,7 +5,7 @@ import api from '@/lib/api'
 import { toast } from 'sonner'
 import { formatCents, formatDate, formatPercent } from '@/lib/utils'
 import { StatusBadge } from '@/components/shared/StatusBadge'
-import { LOAN_PURPOSE_LABELS } from '@lendflow/shared'
+import { LOAN_PURPOSE_LABELS, quoteAdvance } from '@lendflow/shared'
 import type { LoanPurpose, LoanStatus } from '@lendflow/shared'
 import { ChevronRight } from 'lucide-react'
 
@@ -15,6 +15,10 @@ interface ScheduleRow {
   total_due: number
   total_paid: number
   status: string
+  principal_due?: number
+  principal_paid?: number
+  interest_due?: number
+  interest_paid?: number
 }
 
 export interface DashboardLoan {
@@ -97,22 +101,33 @@ export function CommitmentCard({
       </p>
     </Link>
     {loan.payment_channel === 'instapay' && loan.id && remaining > 0 && (
-      <PayControls loanId={loan.id} />
+      <PayControls loanId={loan.id} loan={loan} schedule={schedule} currency={currency} />
     )}
     </article>
   )
 }
 
-function PayControls({ loanId }: { loanId: string }) {
+function PayControls({
+  loanId,
+  loan,
+  schedule,
+  currency,
+}: {
+  loanId: string
+  loan: DashboardLoan
+  schedule: ScheduleRow[]
+  currency?: string
+}) {
   const [amount, setAmount] = useState('')
   const qc = useQueryClient()
   const pay = useMutation({
-    mutationFn: (body: { mode: 'partial' | 'full'; amount?: number }) =>
+    mutationFn: (body: { mode: 'partial' | 'full' | 'advance'; amount?: number }) =>
       api.post(`/api/lender/loans/${loanId}/instapay-payment`, body),
-    onSuccess: () => {
+    onSuccess: (res) => {
       setAmount('')
       qc.invalidateQueries({ queryKey: ['lender-commitments'] })
-      toast.success('Payment recorded')
+      const saved = (res.data as { interest_saved?: number }).interest_saved ?? 0
+      toast.success(saved > 0 ? 'Advance payment recorded. Interest was recalculated.' : 'Payment recorded')
     },
     onError: (err: unknown) => {
       const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Could not record the payment'
@@ -120,7 +135,30 @@ function PayControls({ loanId }: { loanId: string }) {
     },
   })
 
+  const advance = quoteAdvance(schedule.map(row => ({
+    ...row,
+    principal_due: row.principal_due ?? 0,
+    interest_due: row.interest_due ?? 0,
+  })), loan.interest_rate ?? 0)
+  const early = advance && advance.days_early > 0 && advance.interest_saved > 0
+
   return (
+    <div className="space-y-2">
+    {early && (
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <p className="flex-1 text-xs text-muted-foreground">
+          Early payoff {formatCents(advance.payoff_amount, currency)}. That removes {formatCents(advance.interest_saved, currency)} of interest.
+        </p>
+        <button
+          type="button"
+          disabled={pay.isPending}
+          onClick={() => pay.mutate({ mode: 'advance' })}
+          className="min-h-11 rounded-xl border px-3 text-sm font-semibold hover:bg-muted disabled:opacity-50"
+        >
+          Pay early
+        </button>
+      </div>
+    )}
     <div className="flex flex-col gap-2 sm:flex-row">
       <input
         type="number"
@@ -147,6 +185,7 @@ function PayControls({ loanId }: { loanId: string }) {
       >
         Paid in full
       </button>
+    </div>
     </div>
   )
 }

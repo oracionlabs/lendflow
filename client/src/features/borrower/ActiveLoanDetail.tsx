@@ -8,7 +8,7 @@ import { CreditGradeBadge } from '@/components/shared/CreditGradeBadge'
 import { TableSkeleton } from '@/components/shared/LoadingSkeleton'
 import { toast } from 'sonner'
 import type { Loan, LoanScheduleItem } from '@lendflow/shared'
-import { LOAN_PURPOSE_LABELS } from '@lendflow/shared'
+import { LOAN_PURPOSE_LABELS, quoteAdvance } from '@lendflow/shared'
 import { CheckCircle, Clock, AlertCircle, XCircle } from 'lucide-react'
 
 const CANCEL_REASONS = [
@@ -89,7 +89,7 @@ export function ActiveLoanDetail() {
           ? (payAmount ?? 0)
           : nextDue.total_due + nextDue.late_fee
 
-      await api.post(`/api/loans/${id}/payments`, { schedule_id: nextDue.id, amount })
+      await api.post(`/api/loans/${id}/payments`, { schedule_id: nextDue.id, amount, advance: payMode === 'payoff' })
       qc.invalidateQueries({ queryKey: ['loan-schedule', id] })
       qc.invalidateQueries({ queryKey: ['wallet'] })
       qc.invalidateQueries({ queryKey: ['payoff-quote', id] })
@@ -224,9 +224,18 @@ export function ActiveLoanDetail() {
           {nextDue && loan.status !== 'completed' && loan.payment_channel === 'instapay' && (
             <div className="card-base p-5 space-y-3">
               <p className="font-semibold">Pay with InstaPay</p>
-              <p className="text-sm text-muted-foreground">
-                Send {fmt(nextDue.total_due + nextDue.late_fee)} to your lender by {formatDate(nextDue.due_date)}. The money does not go through this app. Your lender records it when it arrives.
-              </p>
+              {(() => {
+                const advance = quoteAdvance(schedule ?? [], loan.interest_rate ?? 0)
+                const early = advance && advance.days_early > 0 && advance.interest_saved > 0
+                return (
+                  <p className="text-sm text-muted-foreground">
+                    {early
+                      ? `Pay ${fmt(advance.payoff_amount)} today and the interest drops by ${fmt(advance.interest_saved)}. Waiting until ${formatDate(advance.due_date)} keeps the full ${fmt(advance.scheduled_amount)}.`
+                      : `Send ${fmt(nextDue.total_due + nextDue.late_fee)} to your lender by ${formatDate(nextDue.due_date)}.`}
+                    {' '}The money does not go through this app. Your lender records it when it arrives.
+                  </p>
+                )
+              })()}
               {instapayQr && <img src={instapayQr} alt="Lender InstaPay QR" className="w-56 rounded-xl border bg-white" />}
             </div>
           )}
@@ -276,14 +285,18 @@ export function ActiveLoanDetail() {
                 {payMode === 'payoff' && payoffData && (
                   <div className="rounded-md bg-green-50 border border-green-200 p-3 text-sm">
                     <p className="font-medium text-green-800">Pay {fmt(payoffData.payoff_amount)} to close your loan</p>
-                    <p className="text-green-700 mt-0.5">You'll save {fmt(payoffData.interest_saved)} in interest</p>
+                    <p className="text-green-700 mt-0.5">
+                      {payoffData.interest_saved > 0
+                        ? `Paying early removes ${fmt(payoffData.interest_saved)} of interest.`
+                        : 'The interest stays as scheduled.'}
+                    </p>
                   </div>
                 )}
 
                 <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                   <button
                     onClick={handlePayment}
-                    disabled={paying || (payMode === 'custom' && !payAmount) || (walletData?.available_balance ?? 0) < (nextDue.total_due + nextDue.late_fee)}
+                    disabled={paying || (payMode === 'custom' && !payAmount) || (walletData?.available_balance ?? 0) < (payMode === 'payoff' ? (payoffData?.payoff_amount ?? 0) : payMode === 'custom' ? (payAmount ?? 0) : nextDue.total_due + nextDue.late_fee)}
                     className="min-h-11 rounded-lg bg-primary px-6 text-sm font-semibold text-white hover:bg-primary/90 disabled:opacity-50 transition-colors"
                   >
                     {paying ? 'Processing…' : 'Make Payment'}

@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useParams } from 'react-router-dom'
 import api from '@/lib/api'
 import { formatCents, formatDate } from '@/lib/utils'
-import { LOAN_PURPOSE_LABELS } from '@lendflow/shared'
+import { LOAN_PURPOSE_LABELS, quoteAdvance } from '@lendflow/shared'
 import type { LoanPurpose } from '@lendflow/shared'
 
 interface ScheduleRow {
@@ -13,6 +13,10 @@ interface ScheduleRow {
   status: string
   paid_at?: string
   payment_note?: string
+  principal_due?: number
+  principal_paid?: number
+  interest_due?: number
+  interest_paid?: number
 }
 
 interface TrackLoan {
@@ -26,6 +30,7 @@ interface TrackLoan {
   amount_requested: number
   monthly_payment?: number
   total_repayment?: number
+  interest_rate?: number
   verification_mode?: string
   payment_channel?: string
   loan_schedule?: ScheduleRow[]
@@ -94,6 +99,12 @@ export function TrackLoans() {
           {data.loans.map(loan => {
             const amount = loan.approved_amount ?? loan.amount_requested
             const schedule = [...(loan.loan_schedule ?? [])].sort((a, b) => a.installment_number - b.installment_number)
+            const advance = quoteAdvance(schedule.map(row => ({
+              ...row,
+              principal_due: row.principal_due ?? 0,
+              interest_due: row.interest_due ?? 0,
+            })), loan.interest_rate ?? 0)
+            const early = advance && advance.days_early > 0 && advance.interest_saved > 0
             return (
               <section key={loan.id} className="card-base p-5 sm:p-6 space-y-4">
                 <div className="flex items-start justify-between gap-3">
@@ -104,6 +115,11 @@ export function TrackLoans() {
                   </div>
                   <p className="font-bold tabular-nums">{formatCents(amount, loan.currency)}</p>
                 </div>
+                {early && (
+                  <p className="text-sm text-muted-foreground">
+                    Pay {formatCents(advance.payoff_amount, loan.currency)} today and the interest drops by {formatCents(advance.interest_saved, loan.currency)}. The full amount on {formatDate(advance.due_date)} is {formatCents(advance.scheduled_amount, loan.currency)}.
+                  </p>
+                )}
                 <div className="divide-y divide-border/70 text-sm">
                   {schedule.map(row => (
                     <div key={row.installment_number} className="flex items-center justify-between gap-3 py-3">

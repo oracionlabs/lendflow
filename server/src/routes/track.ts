@@ -44,10 +44,13 @@ router.get('/:token', async (req: Request, res: Response): Promise<void> => {
     .from('loans')
     .select(`
       id, purpose, status, currency, approved_amount, amount_requested,
-      loan_kind, product_name,
+      loan_kind, product_name, interest_rate,
       monthly_payment, total_repayment, term_months, maturity_date,
       verification_mode, payment_channel,
-      loan_schedule (installment_number, due_date, total_due, total_paid, status, paid_at, payment_note)
+      loan_schedule (
+        installment_number, due_date, total_due, total_paid, status, paid_at, payment_note,
+        principal_due, principal_paid, interest_due, interest_paid
+      )
     `)
     .eq('borrower_id', access.borrower_id)
     .in('id', loanIds)

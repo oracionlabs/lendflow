@@ -1,5 +1,22 @@
 import { Router, Request, Response } from 'express'
 import { supabaseAdmin } from '../lib/supabase'
+import { quoteAdvance } from '@lendflow/shared'
+
+function reduceScheduleInterest(
+  rows: Array<{ interest_due: number; interest_paid?: number | null; total_due: number }>,
+  savings: number,
+): number {
+  let left = Math.max(0, Math.round(savings))
+  for (let i = rows.length - 1; i >= 0 && left > 0; i--) {
+    const row = rows[i]
+    const room = Math.max(0, row.interest_due - (row.interest_paid ?? 0))
+    const cut = Math.min(room, left)
+    row.interest_due -= cut
+    row.total_due -= cut
+    left -= cut
+  }
+  return Math.max(0, Math.round(savings)) - left
+}
 
 const router = Router()
 
@@ -30,7 +47,7 @@ router.get('/:loanId/payments', async (req: Request, res: Response): Promise<voi
 
 router.post('/:loanId/payments', async (req: Request, res: Response): Promise<void> => {
   const user = res.locals.user
-  const { schedule_id, amount } = req.body as { schedule_id: string; amount: number }
+  const { schedule_id, amount, advance } = req.body as { schedule_id: string; amount: number; advance?: boolean }
 
   if (!schedule_id || !amount || amount <= 0) {
     res.status(400).json({ error: 'schedule_id and positive amount are required' })
@@ -51,6 +68,65 @@ router.post('/:loanId/payments', async (req: Request, res: Response): Promise<vo
 
   if (!['active', 'repaying'].includes(loan.status)) {
     res.status(400).json({ error: 'Loan is not in a payable state' }); return
+  }
+
+  if (advance) {
+    const { data: priced } = await db
+      .from('loans')
+      .select('interest_rate, total_repayment')
+      .eq('id', req.params.loanId)
+      .single()
+    const { data: schedule } = await db
+      .from('loan_schedule')
+      .select('*')
+      .eq('loan_id', req.params.loanId)
+      .order('installment_number', { ascending: true })
+    const open = (schedule ?? []).filter(row => !['paid', 'waived'].includes(row.status) && row.total_due - (row.total_paid ?? 0) > 0)
+    const quote = quoteAdvance(open, Number(priced?.interest_rate ?? 0))
+    if (!quote) {
+      res.status(400).json({ error: 'This loan is already paid' }); return
+    }
+    const lateFees = open.reduce((sum, row) => sum + (row.late_fee ?? 0), 0)
+    const { data: balance } = await db.from('wallets').select('available_balance').eq('user_id', user.id).single()
+    if (!balance || balance.available_balance < quote.payoff_amount + lateFees) {
+      res.status(400).json({ error: 'Insufficient wallet balance' }); return
+    }
+    const saved = reduceScheduleInterest(open, quote.interest_saved)
+    for (const row of open) {
+      const { error: cutError } = await db.from('loan_schedule').update({
+        interest_due: row.interest_due,
+        total_due: row.total_due,
+      }).eq('id', row.id)
+      if (cutError) { res.status(500).json({ error: cutError.message }); return }
+    }
+    if (saved > 0) {
+      await db.from('loans').update({
+        total_repayment: Math.max(0, (priced?.total_repayment ?? 0) - saved),
+      }).eq('id', req.params.loanId)
+      const { data: commits } = await db
+        .from('funding_commitments')
+        .select('id, expected_yield, share_percent')
+        .eq('loan_id', req.params.loanId)
+      for (const commit of commits ?? []) {
+        const cut = Math.round(saved * Number(commit.share_percent ?? 100) / 100)
+        await db.from('funding_commitments').update({
+          expected_yield: Math.max(0, (commit.expected_yield ?? 0) - cut),
+        }).eq('id', commit.id)
+      }
+    }
+
+    let totalPaid = 0
+    for (const row of open) {
+      const { data, error } = await db.rpc('process_borrower_payment', {
+        p_loan_id: req.params.loanId,
+        p_schedule_id: row.id,
+        p_amount: row.total_due + (row.late_fee ?? 0),
+      })
+      if (error) { res.status(500).json({ error: error.message }); return }
+      totalPaid += Number((data as { total_paid?: number } | null)?.total_paid ?? 0)
+    }
+    res.json({ total_paid: totalPaid, interest_saved: saved })
+    return
   }
 
   const { data: wallet } = await db

@@ -2,6 +2,23 @@ import { Router, Request, Response } from 'express'
 import { supabaseAdmin } from '../lib/supabase'
 import { assessCredit } from '../lib/credit-assessment'
 import { ensureLoanAccess } from '../lib/loan-access'
+import { partialAdvanceSavings, quoteAdvance } from '@lendflow/shared'
+
+function reduceScheduleInterest(
+  rows: Array<{ interest_due: number; interest_paid?: number | null; total_due: number }>,
+  savings: number,
+): number {
+  let left = Math.max(0, Math.round(savings))
+  for (let i = rows.length - 1; i >= 0 && left > 0; i--) {
+    const row = rows[i]
+    const room = Math.max(0, row.interest_due - (row.interest_paid ?? 0))
+    const cut = Math.min(room, left)
+    row.interest_due -= cut
+    row.total_due -= cut
+    left -= cut
+  }
+  return Math.max(0, Math.round(savings)) - left
+}
 
 const router = Router()
 
@@ -87,7 +104,7 @@ router.get('/commitments', async (req: Request, res: Response): Promise<void> =>
         amount_requested, approved_amount, monthly_payment, currency,
         loan_kind, product_name, payment_channel,
         users!borrower_id (name),
-        loan_schedule (installment_number, due_date, total_due, total_paid, status)
+        loan_schedule (installment_number, due_date, total_due, total_paid, status, principal_due, principal_paid, interest_due, interest_paid)
       )
     `)
     .eq('lender_id', user.id)
@@ -566,20 +583,32 @@ router.post('/loans/:loanId/instapay-payment', async (req: Request, res: Respons
   const { schedule_id, amount, mode } = req.body as {
     schedule_id?: string
     amount?: number
-    mode?: 'partial' | 'full' | 'installment'
+    mode?: 'partial' | 'full' | 'installment' | 'advance'
   }
 
   const db = supabaseAdmin()
   const { data: commitment } = await db
     .from('funding_commitments')
-    .select('id, actual_yield, loans!inner(id, borrower_id, payment_channel, status)')
+    .select('id, actual_yield, expected_yield, share_percent, loans!inner(id, borrower_id, payment_channel, status, interest_rate, total_repayment)')
     .eq('lender_id', lender.id)
     .eq('loan_id', req.params.loanId)
     .limit(1)
     .maybeSingle()
 
   if (!commitment) { res.status(404).json({ error: 'Loan not found' }); return }
-  const loanJoin = commitment.loans as { id: string; payment_channel?: string; status: string } | { id: string; payment_channel?: string; status: string }[]
+  const loanJoin = commitment.loans as {
+    id: string
+    payment_channel?: string
+    status: string
+    interest_rate?: number
+    total_repayment?: number
+  } | Array<{
+    id: string
+    payment_channel?: string
+    status: string
+    interest_rate?: number
+    total_repayment?: number
+  }>
   const loan = Array.isArray(loanJoin) ? loanJoin[0] : loanJoin
   if (!loan || loan.payment_channel !== 'instapay') {
     res.status(400).json({ error: 'This loan is paid through the app wallet' })
@@ -611,8 +640,52 @@ router.post('/loans/:loanId/instapay-payment', async (req: Request, res: Respons
   }
 
   const payMode = mode ?? (schedule_id ? 'installment' : 'partial')
-  const payAmount = payMode === 'partial' ? Math.round(amount ?? 0) : outstanding
-  if (payMode === 'partial' && (payAmount <= 0 || payAmount > outstanding)) {
+  let interestSaved = 0
+  let advanceInterestRoom = Number.POSITIVE_INFINITY
+  if (payMode === 'advance') {
+    const quote = quoteAdvance(open, Number(loan.interest_rate ?? 0))
+    const requested = amount == null ? (quote?.payoff_amount ?? 0) : Math.round(amount)
+    if (!quote || requested <= 0) {
+      res.status(400).json({ error: 'Enter the advance amount' })
+      return
+    }
+    if (requested > quote.payoff_amount) {
+      res.status(400).json({ error: 'That is more than the early payoff' })
+      return
+    }
+    interestSaved = amount == null || requested >= quote.payoff_amount
+      ? quote.interest_saved
+      : partialAdvanceSavings(open, Number(loan.interest_rate ?? 0), requested)
+    advanceInterestRoom = amount == null || requested >= quote.payoff_amount
+      ? quote.interest_due_today
+      : Math.min(requested, quote.interest_due_today)
+    interestSaved = reduceScheduleInterest(open, interestSaved)
+    for (const row of open) {
+      const { error: cutError } = await db.from('loan_schedule').update({
+        interest_due: row.interest_due,
+        total_due: row.total_due,
+      }).eq('id', row.id)
+      if (cutError) { res.status(500).json({ error: cutError.message }); return }
+    }
+    if (interestSaved > 0) {
+      await db.from('loans').update({
+        total_repayment: Math.max(0, (loan.total_repayment ?? 0) - interestSaved),
+      }).eq('id', req.params.loanId)
+      const share = Number(commitment.share_percent ?? 100) / 100
+      await db.from('funding_commitments').update({
+        expected_yield: Math.max(0, (commitment.expected_yield ?? 0) - Math.round(interestSaved * share)),
+      }).eq('id', commitment.id)
+    }
+  }
+
+  const payRows = payMode === 'advance' ? open : targets
+  const outstandingNow = payRows.reduce((sum, row) => sum + (row.total_due - (row.total_paid ?? 0)), 0)
+  const payAmount = payMode === 'partial' || (payMode === 'advance' && amount != null)
+    ? Math.round(amount ?? 0)
+    : payMode === 'advance'
+      ? outstandingNow
+      : outstanding
+  if ((payMode === 'partial' || (payMode === 'advance' && amount != null)) && (payAmount <= 0 || payAmount > outstandingNow)) {
     res.status(400).json({ error: 'Enter an amount up to the remaining balance' })
     return
   }
@@ -620,15 +693,22 @@ router.post('/loans/:loanId/instapay-payment', async (req: Request, res: Respons
   let left = payAmount
   let interestRecorded = 0
   const now = new Date().toISOString()
-  const note = payMode === 'full' ? 'Paid in full' : 'Partial'
+  const note = payMode === 'full' ? 'Paid in full' : payMode === 'advance' ? 'Advance' : 'Partial'
 
-  for (const row of targets) {
+  for (const row of payRows) {
     if (left <= 0) break
     const owed = row.total_due - (row.total_paid ?? 0)
-    const apply = Math.min(left, owed)
     const interestOwed = Math.max(0, row.interest_due - (row.interest_paid ?? 0))
-    const interestPortion = Math.min(interestOwed, apply)
-    const principalPortion = apply - interestPortion
+    const principalRoom = Math.max(0, row.principal_due - (row.principal_paid ?? 0))
+    const interestPortion = payMode === 'advance'
+      ? Math.min(interestOwed, left, advanceInterestRoom)
+      : Math.min(interestOwed, left, owed)
+    const principalPortion = payMode === 'advance'
+      ? Math.min(principalRoom, left - interestPortion)
+      : Math.min(left, owed) - interestPortion
+    const apply = interestPortion + principalPortion
+    if (apply <= 0) continue
+    if (payMode === 'advance') advanceInterestRoom -= interestPortion
     const totalPaid = (row.total_paid ?? 0) + apply
     const settled = totalPaid >= row.total_due
     const { error: payError } = await db.from('loan_schedule').update({
@@ -664,7 +744,7 @@ router.post('/loans/:loanId/instapay-payment', async (req: Request, res: Respons
   }).eq('id', commitment.id)
   await db.from('loans').update({ status: done ? 'completed' : 'repaying' }).eq('id', req.params.loanId)
 
-  res.json({ success: true, applied: payAmount - left, loan_status: done ? 'completed' : 'repaying' })
+  res.json({ success: true, applied: payAmount - left, interest_saved: interestSaved, loan_status: done ? 'completed' : 'repaying' })
 })
 
 router.post('/loans/:loanId/extend', async (req: Request, res: Response): Promise<void> => {

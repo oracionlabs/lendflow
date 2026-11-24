@@ -6,7 +6,7 @@ import { toast } from 'sonner'
 import { formatCents, formatDate, formatPercent, getCurrencySymbol } from '@/lib/utils'
 import { CreditGradeBadge } from '@/components/shared/CreditGradeBadge'
 import { CardSkeleton } from '@/components/shared/LoadingSkeleton'
-import { LOAN_PURPOSE_LABELS } from '@lendflow/shared'
+import { LOAN_PURPOSE_LABELS, partialAdvanceSavings, quoteAdvance } from '@lendflow/shared'
 import { ArrowLeft, TrendingUp, XCircle } from 'lucide-react'
 import { QrImage } from '@/components/shared/QrImage'
 import type { LoanScheduleItem } from '@lendflow/shared'
@@ -102,14 +102,16 @@ export function CommitmentDetail() {
   })
 
   const markPaid = useMutation({
-    mutationFn: (body: { mode: 'partial' | 'full' | 'installment'; amount?: number; schedule_id?: string }) =>
+    mutationFn: (body: { mode: 'partial' | 'full' | 'installment' | 'advance'; amount?: number; schedule_id?: string }) =>
       api.post(`/api/lender/loans/${loanId}/instapay-payment`, body),
-    onSuccess: () => {
+    onSuccess: (res) => {
       qc.invalidateQueries({ queryKey: ['lender-schedule', loanId] })
       qc.invalidateQueries({ queryKey: ['commitment', id] })
       qc.invalidateQueries({ queryKey: ['commitment-yields', id] })
+      qc.invalidateQueries({ queryKey: ['lender-commitments'] })
       setPartialAmount('')
-      toast.success('Payment recorded')
+      const saved = (res.data as { interest_saved?: number }).interest_saved ?? 0
+      toast.success(saved > 0 ? 'Advance payment recorded. Interest was recalculated.' : 'Payment recorded')
     },
     onError: (err: unknown) => {
       const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Could not record the payment'
@@ -351,6 +353,41 @@ export function CommitmentDetail() {
               Record partial
             </button>
           </div>
+          {(() => {
+            const advance = quoteAdvance(schedule, loan.interest_rate ?? 0)
+            if (!advance || advance.days_early <= 0 || advance.interest_saved <= 0) return null
+            const typed = Math.round(Number(partialAmount) * 100)
+            const partialSaved = typed > 0 ? partialAdvanceSavings(schedule, loan.interest_rate ?? 0, typed) : 0
+            return (
+              <div className="space-y-2 rounded-lg bg-muted/60 px-3 py-3">
+                <p className="text-sm font-medium">Advance payment</p>
+                <p className="text-xs text-muted-foreground">
+                  Paying the rest today, {advance.days_early} days early, removes {fmt(advance.interest_saved)}. The amount due becomes {fmt(advance.payoff_amount)} instead of {fmt(advance.scheduled_amount)}.
+                </p>
+                {partialSaved > 0 && (
+                  <p className="text-xs">This partial payment removes {fmt(partialSaved)} of interest.</p>
+                )}
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <button
+                    type="button"
+                    disabled={markPaid.isPending}
+                    onClick={() => markPaid.mutate({ mode: 'advance' })}
+                    className="min-h-11 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+                  >
+                    Record early payoff
+                  </button>
+                  <button
+                    type="button"
+                    disabled={markPaid.isPending || partialSaved <= 0}
+                    onClick={() => markPaid.mutate({ mode: 'advance', amount: typed })}
+                    className="min-h-11 rounded-lg border px-4 text-sm font-medium hover:bg-muted disabled:opacity-50"
+                  >
+                    Record advance partial
+                  </button>
+                </div>
+              </div>
+            )
+          })()}
           {(() => {
             const openRows = schedule.filter(row => row.status !== 'paid' && row.status !== 'waived')
             const last = openRows[openRows.length - 1]

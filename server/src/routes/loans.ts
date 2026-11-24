@@ -3,6 +3,7 @@ import { supabaseAdmin } from '../lib/supabase'
 import { requireBorrower } from '../middleware/requireRole'
 import { assessCredit } from '../lib/credit-assessment'
 import { previewMonthlyPayment } from '../lib/amortization'
+import { quoteAdvance } from '@lendflow/shared'
 import { CREDIT_GRADE_RATES } from '@lendflow/shared'
 import type { User } from '@lendflow/shared'
 
@@ -381,17 +382,19 @@ router.get('/:id/payoff-quote', requireBorrower, async (req: Request, res: Respo
     .from('loan_schedule')
     .select('*')
     .eq('loan_id', req.params.id)
-    .not('status', 'in', '("paid","waived")')
     .order('installment_number', { ascending: true })
 
-  if (!schedule?.length) {
+  const quote = quoteAdvance(schedule ?? [], Number(loan.interest_rate ?? 0))
+  if (!quote) {
     res.json({ payoff_amount: 0, interest_saved: 0 }); return
   }
 
-  const remainingBalance = schedule.reduce((s, r) => s + r.principal_due - r.principal_paid, 0)
-  const interestSaved = schedule.reduce((s, r) => s + r.interest_due - r.interest_paid, 0)
-
-  res.json({ payoff_amount: remainingBalance, interest_saved: interestSaved })
+  res.json({
+    payoff_amount: quote.payoff_amount,
+    interest_saved: quote.interest_saved,
+    days_early: quote.days_early,
+    due_date: quote.due_date,
+  })
 })
 
 router.get('/:id/yield-preview', async (req: Request, res: Response): Promise<void> => {
