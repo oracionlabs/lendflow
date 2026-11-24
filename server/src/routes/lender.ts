@@ -106,7 +106,7 @@ router.get('/commitments/:id', async (req: Request, res: Response): Promise<void
         ai_credit_grade, admin_override_grade, ai_reasoning, ai_risk_factors,
         status, first_payment_date, maturity_date, amount_requested, approved_amount,
         monthly_payment, total_repayment, currency, borrower_id,
-        verification_mode, payment_channel, verification_note
+        verification_mode, payment_channel, verification_note, loan_kind, product_name
       )
     `)
     .eq('id', req.params.id)
@@ -274,6 +274,8 @@ router.post('/loans/new', async (req: Request, res: Response): Promise<void> => 
     max_term_days,
     currency,
     waive_docs,
+    loan_kind,
+    product_name,
   } = req.body as {
     borrower_name: string
     borrower_email?: string
@@ -292,11 +294,19 @@ router.post('/loans/new', async (req: Request, res: Response): Promise<void> => 
     max_term_days?: number
     currency?: string
     waive_docs?: boolean
+    loan_kind?: 'cash' | 'product'
+    product_name?: string
   }
 
   // repayment_type is the new field; payment_type is legacy — accept both
   const effectiveRepaymentType = repaymentTypeInput ?? payment_type ?? 'installments'
 
+  const kind = loan_kind === 'product' ? 'product' : 'cash'
+  const productName = product_name?.trim() || ''
+  if (kind === 'product' && !productName) {
+    res.status(400).json({ error: 'product_name is required for a product loan' })
+    return
+  }
   if (!borrower_name || !purpose || !amount_requested || !effectiveRepaymentType) {
     res.status(400).json({ error: 'borrower_name, purpose, amount_requested, and repayment_type are required' })
     return
@@ -435,6 +445,8 @@ router.post('/loans/new', async (req: Request, res: Response): Promise<void> => 
     verification_mode: waive_docs === false ? 'formal' : 'manual',
     verification_note: waive_docs === false ? null : 'Lender verified this person directly and waived documents.',
     payment_channel: 'instapay',
+    loan_kind: kind,
+    product_name: kind === 'product' ? productName : null,
     amount_funded: amount_requested,
     funding_percent: 100,
     lender_count: 1,
@@ -548,8 +560,11 @@ router.get('/loans/:loanId/access', async (req: Request, res: Response): Promise
 
 router.post('/loans/:loanId/instapay-payment', async (req: Request, res: Response): Promise<void> => {
   const lender = res.locals.user
-  const { schedule_id } = req.body as { schedule_id?: string }
-  if (!schedule_id) { res.status(400).json({ error: 'schedule_id is required' }); return }
+  const { schedule_id, amount, mode } = req.body as {
+    schedule_id?: string
+    amount?: number
+    mode?: 'partial' | 'full' | 'installment'
+  }
 
   const db = supabaseAdmin()
   const { data: commitment } = await db
@@ -572,54 +587,81 @@ router.post('/loans/:loanId/instapay-payment', async (req: Request, res: Respons
     return
   }
 
-  const { data: row } = await db
+  const { data: schedule, error: scheduleError } = await db
     .from('loan_schedule')
     .select('*')
-    .eq('id', schedule_id)
     .eq('loan_id', req.params.loanId)
-    .maybeSingle()
+    .order('installment_number', { ascending: true })
 
-  if (!row) { res.status(404).json({ error: 'Payment not found' }); return }
-  if (row.status === 'paid' || row.status === 'waived') {
-    res.status(400).json({ error: 'This payment is already recorded' })
+  if (scheduleError) { res.status(500).json({ error: scheduleError.message }); return }
+
+  const open = (schedule ?? []).filter(row => !['paid', 'waived'].includes(row.status) && row.total_due - (row.total_paid ?? 0) > 0)
+  const targets = schedule_id ? open.filter(row => row.id === schedule_id) : open
+  if (schedule_id && !targets.length) {
+    res.status(404).json({ error: 'That payment is already recorded' })
+    return
+  }
+  const outstanding = targets.reduce((sum, row) => sum + (row.total_due - (row.total_paid ?? 0)), 0)
+  if (outstanding <= 0) {
+    res.status(400).json({ error: 'This loan is already paid' })
     return
   }
 
+  const payMode = mode ?? (schedule_id ? 'installment' : 'partial')
+  const payAmount = payMode === 'partial' ? Math.round(amount ?? 0) : outstanding
+  if (payMode === 'partial' && (payAmount <= 0 || payAmount > outstanding)) {
+    res.status(400).json({ error: 'Enter an amount up to the remaining balance' })
+    return
+  }
+
+  let left = payAmount
+  let interestRecorded = 0
   const now = new Date().toISOString()
-  const { error: payError } = await db.from('loan_schedule').update({
-    status: 'paid',
-    principal_paid: row.principal_due,
-    interest_paid: row.interest_due,
-    total_paid: row.total_due,
-    paid_at: now,
-    payment_note: 'InstaPay',
-  }).eq('id', row.id)
+  const note = payMode === 'full' ? 'Paid in full' : 'Partial'
 
-  if (payError) { res.status(500).json({ error: payError.message }); return }
+  for (const row of targets) {
+    if (left <= 0) break
+    const owed = row.total_due - (row.total_paid ?? 0)
+    const apply = Math.min(left, owed)
+    const interestOwed = Math.max(0, row.interest_due - (row.interest_paid ?? 0))
+    const interestPortion = Math.min(interestOwed, apply)
+    const principalPortion = apply - interestPortion
+    const totalPaid = (row.total_paid ?? 0) + apply
+    const settled = totalPaid >= row.total_due
+    const { error: payError } = await db.from('loan_schedule').update({
+      status: settled ? 'paid' : 'partial',
+      principal_paid: (row.principal_paid ?? 0) + principalPortion,
+      interest_paid: (row.interest_paid ?? 0) + interestPortion,
+      total_paid: totalPaid,
+      paid_at: now,
+      payment_note: note,
+    }).eq('id', row.id)
+    if (payError) { res.status(500).json({ error: payError.message }); return }
 
-  await db.from('yield_distributions').insert({
-    commitment_id: commitment.id,
-    schedule_id: row.id,
-    principal_return: row.principal_due,
-    interest_return: row.interest_due,
-    total_return: row.total_due,
-  })
+    await db.from('yield_distributions').insert({
+      commitment_id: commitment.id,
+      schedule_id: row.id,
+      principal_return: principalPortion,
+      interest_return: interestPortion,
+      total_return: apply,
+    })
+    interestRecorded += interestPortion
+    left -= apply
+  }
 
-  const { data: remaining } = await db
+  const { data: stillOpen } = await db
     .from('loan_schedule')
-    .select('id')
+    .select('id, total_due, total_paid, status')
     .eq('loan_id', req.params.loanId)
-    .not('status', 'in', '("paid","waived")')
 
-  const done = (remaining ?? []).length === 0
+  const done = (stillOpen ?? []).every(row => ['paid', 'waived'].includes(row.status) || (row.total_paid ?? 0) >= row.total_due)
   await db.from('funding_commitments').update({
-    actual_yield: (commitment.actual_yield ?? 0) + row.interest_due,
+    actual_yield: (commitment.actual_yield ?? 0) + interestRecorded,
     status: done ? 'completed' : 'repaying',
   }).eq('id', commitment.id)
-
   await db.from('loans').update({ status: done ? 'completed' : 'repaying' }).eq('id', req.params.loanId)
 
-  res.json({ success: true, loan_status: done ? 'completed' : 'repaying' })
+  res.json({ success: true, applied: payAmount - left, loan_status: done ? 'completed' : 'repaying' })
 })
 
 router.post('/commitments/:id/cancel', async (req: Request, res: Response): Promise<void> => {

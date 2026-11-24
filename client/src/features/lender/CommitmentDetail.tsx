@@ -50,6 +50,8 @@ interface CommitmentDetail {
     borrower_id?: string
     verification_mode?: 'formal' | 'manual'
     payment_channel?: 'wallet' | 'instapay'
+    loan_kind?: 'cash' | 'product'
+    product_name?: string | null
     verification_note?: string
   }
 }
@@ -66,6 +68,7 @@ export function CommitmentDetail() {
   const { id } = useParams<{ id: string }>()
   const qc = useQueryClient()
   const [showCancel, setShowCancel] = useState(false)
+  const [partialAmount, setPartialAmount] = useState('')
   const [cancelReason, setCancelReason] = useState(CANCEL_REASONS[0])
   const [cancelOther, setCancelOther] = useState('')
 
@@ -98,12 +101,14 @@ export function CommitmentDetail() {
   })
 
   const markPaid = useMutation({
-    mutationFn: (scheduleId: string) => api.post(`/api/lender/loans/${loanId}/instapay-payment`, { schedule_id: scheduleId }),
+    mutationFn: (body: { mode: 'partial' | 'full' | 'installment'; amount?: number; schedule_id?: string }) =>
+      api.post(`/api/lender/loans/${loanId}/instapay-payment`, body),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['lender-schedule', loanId] })
       qc.invalidateQueries({ queryKey: ['commitment', id] })
       qc.invalidateQueries({ queryKey: ['commitment-yields', id] })
-      toast.success('InstaPay payment recorded')
+      setPartialAmount('')
+      toast.success('Payment recorded')
     },
     onError: (err: unknown) => {
       const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Could not record the payment'
@@ -178,7 +183,7 @@ export function CommitmentDetail() {
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap mb-1">
-              <h1 className="text-lg font-bold leading-tight">{LOAN_PURPOSE_LABELS[loan.purpose] ?? loan.purpose}</h1>
+              <h1 className="text-lg font-bold leading-tight">{loan.loan_kind === 'product' && loan.product_name ? loan.product_name : (LOAN_PURPOSE_LABELS[loan.purpose] ?? loan.purpose)}</h1>
               <CreditGradeBadge grade={grade} />
             </div>
             <p className="text-xs text-muted-foreground">
@@ -295,29 +300,65 @@ export function CommitmentDetail() {
       )}
 
       {loan.payment_channel === 'instapay' && !!schedule?.length && (
-        <section className="card-base p-4 space-y-2">
-          <h2 className="font-semibold text-sm">InstaPay payments</h2>
-          {schedule.map(row => (
-            <div key={row.id} className="flex items-center justify-between gap-3 border-b py-2 last:border-0 text-sm">
-              <div>
-                <p>#{row.installment_number} · {formatDate(row.due_date)}</p>
-                <p className="text-xs text-muted-foreground capitalize">{row.status}</p>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="font-mono">{fmt(row.total_due)}</span>
-                {row.status !== 'paid' && row.status !== 'waived' && (
-                  <button
-                    type="button"
-                    disabled={markPaid.isPending}
-                    onClick={() => markPaid.mutate(row.id)}
-                    className="min-h-11 rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground disabled:opacity-50"
-                  >
-                    Received
-                  </button>
-                )}
-              </div>
+        <section className="card-base p-4 space-y-3">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2 className="font-semibold text-sm">{loan.loan_kind === 'product' ? 'Product payments' : 'Payments'}</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Remaining {fmt(schedule.reduce((sum, row) => sum + Math.max(0, row.total_due - row.total_paid), 0))}
+              </p>
             </div>
-          ))}
+            <button
+              type="button"
+              disabled={markPaid.isPending || schedule.every(row => row.status === 'paid' || row.status === 'waived')}
+              onClick={() => markPaid.mutate({ mode: 'full' })}
+              className="min-h-11 shrink-0 rounded-lg bg-emerald-600 px-3 text-xs font-semibold text-white disabled:opacity-50"
+            >
+              Paid in full
+            </button>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <input
+              type="number"
+              min="1"
+              value={partialAmount}
+              onChange={e => setPartialAmount(e.target.value)}
+              placeholder="Partial amount"
+              className="min-h-11 flex-1 rounded-lg border bg-background px-3 text-sm"
+            />
+            <button
+              type="button"
+              disabled={markPaid.isPending || !(Number(partialAmount) > 0)}
+              onClick={() => markPaid.mutate({ mode: 'partial', amount: Math.round(Number(partialAmount) * 100) })}
+              className="min-h-11 rounded-lg border px-4 text-sm font-medium hover:bg-muted disabled:opacity-50"
+            >
+              Record partial
+            </button>
+          </div>
+          {schedule.map(row => {
+            const owed = Math.max(0, row.total_due - row.total_paid)
+            return (
+              <div key={row.id} className="flex items-center justify-between gap-3 border-b py-2 last:border-0 text-sm">
+                <div>
+                  <p>#{row.installment_number} · {formatDate(row.due_date)}</p>
+                  <p className="text-xs text-muted-foreground capitalize">{row.status}{row.total_paid > 0 ? ` · ${fmt(row.total_paid)} received` : ''}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="font-mono">{fmt(owed > 0 ? owed : row.total_due)}</span>
+                  {owed > 0 && (
+                    <button
+                      type="button"
+                      disabled={markPaid.isPending}
+                      onClick={() => markPaid.mutate({ mode: 'installment', schedule_id: row.id })}
+                      className="min-h-11 rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground disabled:opacity-50"
+                    >
+                      This one
+                    </button>
+                  )}
+                </div>
+              </div>
+            )
+          })}
         </section>
       )}
 

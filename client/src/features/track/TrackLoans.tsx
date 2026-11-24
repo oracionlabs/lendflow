@@ -9,6 +9,7 @@ interface ScheduleRow {
   installment_number: number
   due_date: string
   total_due: number
+  total_paid?: number
   status: string
   paid_at?: string
   payment_note?: string
@@ -17,6 +18,8 @@ interface ScheduleRow {
 interface TrackLoan {
   id: string
   purpose: string
+  loan_kind?: string
+  product_name?: string | null
   status: string
   currency?: string
   approved_amount?: number
@@ -86,7 +89,8 @@ export function TrackLoans() {
           <section key={loan.id} className="card-base p-4 space-y-3">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="font-semibold">{LOAN_PURPOSE_LABELS[loan.purpose as LoanPurpose] ?? loan.purpose}</p>
+                <p className="font-semibold">{loan.loan_kind === 'product' && loan.product_name ? loan.product_name : (LOAN_PURPOSE_LABELS[loan.purpose as LoanPurpose] ?? loan.purpose)}</p>
+                {loan.loan_kind === 'product' && <p className="text-xs text-muted-foreground">Product loan</p>}
                 <p className="text-xs text-muted-foreground capitalize">{loan.status.replaceAll('_', ' ')}</p>
               </div>
               <p className="font-bold">{formatCents(amount, loan.currency)}</p>
@@ -96,9 +100,9 @@ export function TrackLoans() {
                 <div key={row.installment_number} className="flex items-center justify-between gap-3 py-2">
                   <div>
                     <p>#{row.installment_number} · {formatDate(row.due_date)}</p>
-                    <p className="text-xs text-muted-foreground capitalize">{row.status}{row.payment_note ? ` · ${row.payment_note}` : ''}</p>
+                    <p className="text-xs text-muted-foreground capitalize">{row.status}{(row.total_paid ?? 0) > 0 ? ` · ${formatCents(row.total_paid ?? 0, loan.currency)} received` : ''}</p>
                   </div>
-                  <p className="font-mono">{formatCents(row.total_due, loan.currency)}</p>
+                  <p className="font-mono">{formatCents(Math.max(0, row.total_due - (row.total_paid ?? 0)) || row.total_due, loan.currency)}</p>
                 </div>
               ))}
             </div>

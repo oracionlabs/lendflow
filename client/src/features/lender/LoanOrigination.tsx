@@ -32,6 +32,8 @@ interface Form {
   payment_frequency: PaymentFrequency
   max_term_days: number
   currency: string
+  loan_kind: 'cash' | 'product'
+  product_name: string
 }
 
 const INITIAL: Form = {
@@ -50,6 +52,8 @@ const INITIAL: Form = {
   payment_frequency: 'monthly',
   max_term_days: 90,
   currency: 'PHP',
+  loan_kind: 'cash',
+  product_name: '',
 }
 
 const RATE_OPTIONS: { value: RatePeriod; label: string; desc: string }[] = [
@@ -230,6 +234,8 @@ export function LoanOrigination() {
         max_term_days: form.payment_type === 'daily_interest' ? form.max_term_days : undefined,
         currency: form.currency,
         waive_docs: waiveDocs,
+        loan_kind: form.loan_kind,
+        product_name: form.loan_kind === 'product' ? form.product_name.trim() : undefined,
       })
       return data as { access_token?: string }
     },
@@ -255,7 +261,7 @@ export function LoanOrigination() {
 
   // Step validity
   const step1Valid = form.borrower_name.trim().length > 0
-  const step2Valid = form.amount > 0 && form.interest_rate > 0 && (() => {
+  const step2Valid = form.amount > 0 && (form.loan_kind === 'product' ? form.interest_rate >= 0 && form.product_name.trim().length > 0 : form.interest_rate > 0) && (() => {
     switch (form.payment_type) {
       case 'installments':    return form.term_months > 0
       case 'lump_sum':        return dueDateMode === 'days' ? form.lump_sum_days > 0 : !!form.due_date
@@ -380,7 +386,34 @@ export function LoanOrigination() {
           <h2 className="font-semibold">Loan terms</h2>
 
           <div>
-            <Label>Amount <span className="text-destructive">*</span></Label>
+            <Label>What was given</Label>
+            <div className="grid grid-cols-2 gap-2">
+              {(['cash', 'product'] as const).map(kind => (
+                <button
+                  key={kind}
+                  type="button"
+                  onClick={() => set('loan_kind', kind)}
+                  className={`min-h-11 rounded-lg border text-sm font-medium ${form.loan_kind === kind ? 'bg-primary text-white border-primary' : 'hover:bg-muted'}`}
+                >
+                  {kind === 'cash' ? 'Cash' : 'Product'}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {form.loan_kind === 'product' && (
+            <div>
+              <Label>Product <span className="text-destructive">*</span></Label>
+              <Input
+                value={form.product_name}
+                onChange={e => set('product_name', e.target.value)}
+                placeholder="Phone, motorcycle, appliance…"
+              />
+            </div>
+          )}
+
+          <div>
+            <Label>{form.loan_kind === 'product' ? 'Product value' : 'Amount'} <span className="text-destructive">*</span></Label>
             <div className="relative">
               <span className="absolute left-3 top-2.5 text-muted-foreground text-sm">{symbol}</span>
               <input
@@ -571,6 +604,7 @@ export function LoanOrigination() {
             <div className="space-y-2.5">
               {[
                 { label: 'Borrower', value: form.borrower_name },
+                form.loan_kind === 'product' ? { label: 'Product', value: form.product_name } : { label: 'Given', value: 'Cash' },
                 form.borrower_email ? { label: 'Email', value: form.borrower_email } : null,
                 form.borrower_phone ? { label: 'Phone', value: form.borrower_phone } : null,
                 { label: 'Amount', value: formatCents(form.amount) },

@@ -37,6 +37,8 @@ export interface Loan {
   currency?: string
   verification_mode?: 'formal' | 'manual'
   payment_channel?: 'wallet' | 'instapay'
+  loan_kind?: 'cash' | 'product'
+  product_name?: string | null
   repayment_type?: import('./package.types').RepaymentType
   package_id?: string | null
   payment_frequency?: import('./package.types').PaymentFrequency | null
