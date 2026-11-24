@@ -9,6 +9,7 @@ config({ path: envPath, override: true })
 
 import { createClient } from '@supabase/supabase-js'
 import { calculateAmortization } from '../lib/amortization'
+import { ensureLoanAccess } from '../lib/loan-access'
 
 const supabaseUrl = process.env.SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -118,6 +119,10 @@ async function createPendingRequest(borrowerId: string, listingId: string, opts:
     purpose_description: opts.description ?? null,
     term_months: opts.termMonths,
     repayment_type: 'installments',
+    currency: 'PHP',
+    verification_mode: 'formal',
+    payment_channel: 'wallet',
+    loan_kind: 'cash',
     amount_funded: 0,
     funding_percent: 0,
     lender_count: 0,
@@ -138,6 +143,10 @@ async function createRejectedLoan(borrowerId: string, lenderId: string, listingI
     purpose: opts.purpose,
     term_months: opts.termMonths,
     repayment_type: 'installments',
+    currency: 'PHP',
+    verification_mode: 'formal',
+    payment_channel: 'wallet',
+    loan_kind: 'cash',
     amount_funded: 0,
     funding_percent: 0,
     lender_count: 0,
@@ -188,6 +197,10 @@ async function createActiveLoan(opts: {
     origination_fee: 0,
     origination_fee_percent: 0,
     repayment_type: 'installments',
+    currency: 'PHP',
+    verification_mode: 'formal',
+    payment_channel: 'wallet',
+    loan_kind: 'cash',
     amount_funded: amount,
     funding_percent: 100,
     lender_count: 1,
@@ -289,76 +302,179 @@ async function createActiveLoan(opts: {
   return loan
 }
 
+function addDays(days: number): Date {
+  const date = new Date()
+  date.setHours(12, 0, 0, 0)
+  date.setDate(date.getDate() + days)
+  return date
+}
+
+async function createTrackerLoan(opts: {
+  borrowerId: string
+  lenderId: string
+  purpose: string
+  amount: number
+  annualRate: number
+  daysTotal: number
+  daysElapsed: number
+  extraDays?: number
+  interestDue?: number
+  loanKind?: 'cash' | 'product'
+  productName?: string
+  principalPaid?: number
+  interestPaid?: number
+  loanStatus?: 'active' | 'repaying' | 'completed'
+  note?: string
+}) {
+  const annualRate = Math.round(opts.annualRate * 10000) / 10000
+  const extraDays = opts.extraDays ?? 0
+  const baseInterest = Math.round(opts.amount * annualRate * opts.daysTotal / 365)
+  const extraInterest = Math.round((opts.amount - (opts.principalPaid ?? 0)) * annualRate * extraDays / 365)
+  const interest = Math.max(0, opts.interestDue ?? (baseInterest + extraInterest))
+  const total = opts.amount + interest
+  const principalPaid = opts.principalPaid ?? 0
+  const interestPaid = opts.interestPaid ?? 0
+  const totalPaid = principalPaid + interestPaid
+  const scheduleStatus = totalPaid <= 0 ? 'upcoming' : totalPaid >= total ? 'paid' : 'partial'
+  const loanStatus = opts.loanStatus ?? (scheduleStatus === 'paid' ? 'completed' : totalPaid > 0 ? 'repaying' : 'active')
+  const started = addDays(-opts.daysElapsed)
+  const due = addDays(opts.daysTotal - opts.daysElapsed + extraDays)
+
+  const { data: loan, error } = await db.from('loans').insert({
+    borrower_id: opts.borrowerId,
+    amount_requested: opts.amount,
+    purpose: opts.purpose,
+    purpose_description: opts.note ?? 'Tracked from chat. Paid through InstaPay.',
+    term_months: Math.max(1, Math.ceil((opts.daysTotal + extraDays) / 30)),
+    approved_amount: opts.amount,
+    interest_rate: annualRate,
+    monthly_payment: total,
+    total_repayment: total,
+    origination_fee: 0,
+    origination_fee_percent: 0,
+    repayment_type: 'lump_sum',
+    currency: 'PHP',
+    verification_mode: 'manual',
+    verification_note: 'Lender verified this person directly and waived documents.',
+    payment_channel: 'instapay',
+    loan_kind: opts.loanKind ?? 'cash',
+    product_name: opts.productName ?? null,
+    amount_funded: opts.amount,
+    funding_percent: 100,
+    lender_count: 1,
+    fully_funded_at: started.toISOString(),
+    status: loanStatus,
+    reviewed_by: opts.lenderId,
+    reviewed_at: started.toISOString(),
+    disbursed_at: started.toISOString(),
+    first_payment_date: dateStr(due),
+    maturity_date: dateStr(due),
+  }).select().single()
+  if (error || !loan) throw new Error(`Tracker loan failed: ${error?.message}`)
+
+  const { data: commitment, error: commitError } = await db.from('funding_commitments').insert({
+    lender_id: opts.lenderId,
+    loan_id: loan.id,
+    amount: opts.amount,
+    share_percent: 100,
+    expected_yield: interest,
+    actual_yield: interestPaid,
+    status: loanStatus === 'completed' ? 'completed' : loanStatus === 'repaying' ? 'repaying' : 'active',
+    funded_at: started.toISOString(),
+    completed_at: loanStatus === 'completed' ? new Date().toISOString() : null,
+  }).select().single()
+  if (commitError || !commitment) throw new Error(`Tracker commitment failed: ${commitError?.message}`)
+
+  const { data: row, error: scheduleError } = await db.from('loan_schedule').insert({
+    loan_id: loan.id,
+    installment_number: 1,
+    due_date: dateStr(due),
+    principal_due: opts.amount,
+    interest_due: interest,
+    total_due: total,
+    principal_paid: principalPaid,
+    interest_paid: interestPaid,
+    total_paid: totalPaid,
+    late_fee: 0,
+    status: scheduleStatus,
+    paid_at: totalPaid > 0 ? new Date().toISOString() : null,
+    payment_note: opts.note ?? null,
+    days_late: 0,
+  }).select().single()
+  if (scheduleError || !row) throw new Error(`Tracker schedule failed: ${scheduleError?.message}`)
+
+  if (totalPaid > 0) {
+    await db.from('yield_distributions').insert({
+      commitment_id: commitment.id,
+      schedule_id: row.id,
+      principal_return: principalPaid,
+      interest_return: interestPaid,
+      total_return: totalPaid,
+    })
+  }
+  return loan
+}
+
+async function ensureUser(email: string, name: string, role: 'borrower' | 'lender' | 'admin'): Promise<SeedUser> {
+  const { data: existing } = await db.from('users').select('id, email, name').eq('email', email).maybeSingle()
+  if (existing) {
+    console.log(`Keeping login ${email}`)
+    return { id: existing.id, email, name: existing.name || name }
+  }
+  console.log(`Creating missing login ${email}`)
+  return createUser(email, name, role)
+}
+
+async function clearSampleData(ids: string[]) {
+  const { data: seedLoans } = await db.from('loans').select('id').in('borrower_id', ids)
+  const loanIds = seedLoans?.map(loan => loan.id) ?? []
+  if (loanIds.length) {
+    await db.from('transactions').delete().in('related_loan_id', loanIds)
+    const { data: commits } = await db.from('funding_commitments').select('id').in('loan_id', loanIds)
+    const commitIds = commits?.map(commit => commit.id) ?? []
+    if (commitIds.length) {
+      await db.from('transactions').delete().in('related_commitment_id', commitIds)
+      await db.from('yield_distributions').delete().in('commitment_id', commitIds)
+      await db.from('funding_commitments').delete().in('id', commitIds)
+    }
+    await db.from('loan_schedule').delete().in('loan_id', loanIds)
+    const { error } = await db.from('loans').delete().in('id', loanIds)
+    if (error) throw new Error(`Could not clear sample loans: ${error.message}`)
+  }
+  await db.from('loan_access').delete().in('borrower_id', ids)
+  await db.from('loan_access').delete().in('lender_id', ids)
+  const { data: listings } = await db.from('lender_listings').select('id').in('lender_id', ids)
+  const listingIds = listings?.map(listing => listing.id) ?? []
+  if (listingIds.length) await db.from('loans').update({ listing_id: null }).in('listing_id', listingIds)
+  const { error: listingError } = await db.from('lender_listings').delete().in('lender_id', ids)
+  if (listingError) throw new Error(`Could not clear sample listings: ${listingError.message}`)
+  await db.from('transactions').delete().in('user_id', ids)
+  await db.from('notifications').delete().in('user_id', ids)
+}
+
 async function main() {
-  console.log('🌱 Seeding LendFlow (new model)...\n')
+  console.log('🌱 Seeding LendFlow sample data. Logins stay as they are.\n')
 
-  // Clean existing seed users
-  const seedEmails = [
-    'admin@lendflow.dev',
-    'borrower1@lendflow.dev', 'borrower2@lendflow.dev', 'borrower3@lendflow.dev',
-    'borrower4@lendflow.dev', 'borrower5@lendflow.dev',
-    'lender1@lendflow.dev', 'lender2@lendflow.dev', 'lender3@lendflow.dev',
-    'lender4@lendflow.dev', 'lender5@lendflow.dev',
-  ]
-  // Get IDs of existing seed users
-  const { data: existingUsers } = await db.from('users').select('id').in('email', seedEmails)
-  const ids = existingUsers?.map(u => u.id) ?? []
-
-  if (ids.length) {
-    console.log(`Cleaning up ${ids.length} existing seed users...`)
-
-    // NULL out reviewed_by / changed_by references before deleting
-    await db.from('loans').update({ reviewed_by: null }).in('reviewed_by', ids)
-    await db.from('settings_audit').delete().in('changed_by', ids)
-
-    // Get all commitment IDs (lender side + borrower loan side)
-    const { data: allCommits } = await db.from('funding_commitments').select('id')
-      .or(`lender_id.in.(${ids.join(',')}),loan_id.in.(select id from loans where borrower_id in (${ids.map(i => `'${i}'`).join(',')})  )`)
-    // Simpler: get borrower loan ids first
-    const { data: borrowerLoans } = await db.from('loans').select('id').in('borrower_id', ids)
-    const loanIdList = borrowerLoans?.map(l => l.id) ?? []
-
-    const { data: lenderCommits } = await db.from('funding_commitments').select('id').in('lender_id', ids)
-    const { data: loanCommits } = loanIdList.length
-      ? await db.from('funding_commitments').select('id').in('loan_id', loanIdList)
-      : { data: [] }
-    const commitIdList = [...new Set([
-      ...(lenderCommits?.map(c => c.id) ?? []),
-      ...(loanCommits?.map(c => c.id) ?? []),
-    ])]
-
-    // Delete leaf tables first
-    if (commitIdList.length) await db.from('yield_distributions').delete().in('commitment_id', commitIdList)
-    if (loanIdList.length)   await db.from('loan_schedule').delete().in('loan_id', loanIdList)
-    if (commitIdList.length) await db.from('funding_commitments').delete().in('id', commitIdList)
-    if (loanIdList.length)   await db.from('loans').delete().in('id', loanIdList)
-    await db.from('lender_listings').delete().in('lender_id', ids)
-    await db.from('transactions').delete().in('user_id', ids)
-    await db.from('notifications').delete().in('user_id', ids)
-    await db.from('notification_preferences').delete().in('user_id', ids)
-    await db.from('wallets').delete().in('user_id', ids)
-    await db.from('users').delete().in('id', ids)
-  }
-
-  // Sweep lingering auth accounts
-  const { data: authUsers } = await db.auth.admin.listUsers({ perPage: 200 })
-  for (const au of authUsers?.users ?? []) {
-    if (seedEmails.includes(au.email ?? '')) await db.auth.admin.deleteUser(au.id)
-  }
-
-  // ── Admin ──────────────────────────────────────────────────────────────────
-  console.log('Creating admin...')
-  const admin = await createUser('admin@lendflow.dev', 'Alex Admin', 'admin')
-
-  // ── Borrowers ──────────────────────────────────────────────────────────────
-  console.log('Creating borrowers...')
+  const admin = await ensureUser('admin@lendflow.dev', 'Alex Admin', 'admin')
   const [b1, b2, b3, b4, b5] = await Promise.all([
-    createUser('borrower1@lendflow.dev', 'Sarah Chen', 'borrower'),
-    createUser('borrower2@lendflow.dev', 'Marcus Johnson', 'borrower'),
-    createUser('borrower3@lendflow.dev', 'Emily Rodriguez', 'borrower'),
-    createUser('borrower4@lendflow.dev', 'David Park', 'borrower'),
-    createUser('borrower5@lendflow.dev', 'Lisa Thompson', 'borrower'),
+    ensureUser('borrower1@lendflow.dev', 'Sarah Chen', 'borrower'),
+    ensureUser('borrower2@lendflow.dev', 'Marcus Johnson', 'borrower'),
+    ensureUser('borrower3@lendflow.dev', 'Emily Rodriguez', 'borrower'),
+    ensureUser('borrower4@lendflow.dev', 'David Park', 'borrower'),
+    ensureUser('borrower5@lendflow.dev', 'Lisa Thompson', 'borrower'),
   ])
+  const [l1, l2, l3, l4, l5] = await Promise.all([
+    ensureUser('lender1@lendflow.dev', 'Robert Kim', 'lender'),
+    ensureUser('lender2@lendflow.dev', 'Jennifer Walsh', 'lender'),
+    ensureUser('lender3@lendflow.dev', 'Michael Torres', 'lender'),
+    ensureUser('lender4@lendflow.dev', 'Amanda Foster', 'lender'),
+    ensureUser('lender5@lendflow.dev', 'Christopher Lee', 'lender'),
+  ])
+
+  const ids = [admin, b1, b2, b3, b4, b5, l1, l2, l3, l4, l5].map(user => user.id)
+  console.log('Replacing sample loans, listings, and payments...')
+  await db.from('loans').update({ reviewed_by: null }).in('reviewed_by', ids)
+  await clearSampleData(ids)
 
   await db.from('borrower_profiles').update({ employment_status: 'employed', annual_income: 8500000, monthly_expenses: 350000, credit_score_range: 'good', identity_verified: true }).eq('user_id', b1.id)
   await db.from('borrower_profiles').update({ employment_status: 'self_employed', annual_income: 14000000, monthly_expenses: 480000, credit_score_range: 'very_good', identity_verified: true }).eq('user_id', b2.id)
@@ -371,16 +487,6 @@ async function main() {
     const wallet = await getWallet(b.id)
     await db.from('wallets').update({ available_balance: 5000000 }).eq('user_id', b.id)
   }
-
-  // ── Lenders ────────────────────────────────────────────────────────────────
-  console.log('Creating lenders...')
-  const [l1, l2, l3, l4, l5] = await Promise.all([
-    createUser('lender1@lendflow.dev', 'Robert Kim', 'lender'),
-    createUser('lender2@lendflow.dev', 'Jennifer Walsh', 'lender'),
-    createUser('lender3@lendflow.dev', 'Michael Torres', 'lender'),
-    createUser('lender4@lendflow.dev', 'Amanda Foster', 'lender'),
-    createUser('lender5@lendflow.dev', 'Christopher Lee', 'lender'),
-  ])
 
   await db.from('lender_profiles').update({ lender_type: 'individual', accredited: true, risk_tolerance: 'conservative', identity_verified: true }).eq('user_id', l1.id)
   await db.from('lender_profiles').update({ lender_type: 'institutional', accredited: true, risk_tolerance: 'moderate', identity_verified: true }).eq('user_id', l2.id)
@@ -557,6 +663,97 @@ async function main() {
     amount: 200000, purpose: 'personal', termMonths: 6,
     reason: 'We only fund business, home improvement, and auto loans.',
   })
+
+  console.log('Creating the remaining formal states...')
+  const { error: stateError } = await db.from('loans').insert([
+    {
+      borrower_id: b5.id, amount_requested: 50000, purpose: 'education', purpose_description: 'Draft that was started and not submitted.',
+      term_months: 6, currency: 'PHP', repayment_type: 'installments', status: 'draft', loan_kind: 'cash',
+    },
+    {
+      borrower_id: b3.id, listing_id: listing4.id, amount_requested: 120000, approved_amount: 120000,
+      purpose: 'medical', purpose_description: 'Approved, waiting for a lender to fund it.',
+      term_months: 3, interest_rate: 0.2433, currency: 'PHP', repayment_type: 'lump_sum',
+      status: 'approved', reviewed_by: l4.id, reviewed_at: new Date().toISOString(), loan_kind: 'cash',
+    },
+    {
+      borrower_id: b2.id, listing_id: listing2.id, amount_requested: 1000000, approved_amount: 1000000,
+      purpose: 'business', purpose_description: 'Partly funded. Still open for more.',
+      term_months: 12, interest_rate: 0.6, monthly_payment: 100000, total_repayment: 1600000,
+      currency: 'PHP', repayment_type: 'installments', amount_funded: 400000, funding_percent: 40, lender_count: 1,
+      status: 'funding', reviewed_by: l2.id, reviewed_at: new Date().toISOString(), loan_kind: 'cash',
+    },
+    {
+      borrower_id: b1.id, listing_id: listing5.id, amount_requested: 250000, approved_amount: 250000,
+      purpose: 'home_improvement', purpose_description: 'Fully funded and waiting to be disbursed.',
+      term_months: 6, interest_rate: 0.24, currency: 'PHP', repayment_type: 'installments',
+      amount_funded: 250000, funding_percent: 100, lender_count: 1, fully_funded_at: new Date().toISOString(),
+      status: 'fully_funded', reviewed_by: l5.id, reviewed_at: new Date().toISOString(), loan_kind: 'cash',
+    },
+    {
+      borrower_id: b4.id, listing_id: listing4.id, amount_requested: 90000, purpose: 'personal',
+      purpose_description: 'Borrower cancelled before funding.',
+      term_months: 3, currency: 'PHP', repayment_type: 'installments', status: 'cancelled',
+      rejection_reason: 'No longer need the funds', loan_kind: 'cash',
+    },
+  ])
+  if (stateError) throw new Error(`Could not create formal sample loans: ${stateError.message}`)
+  const { data: fundingLoan } = await db.from('loans').select('id').eq('borrower_id', b2.id).eq('status', 'funding').limit(1).maybeSingle()
+  if (fundingLoan) {
+    await db.from('funding_commitments').insert({
+      lender_id: l4.id, loan_id: fundingLoan.id, amount: 400000, share_percent: 40,
+      expected_yield: 240000, actual_yield: 0, status: 'active',
+    })
+  }
+  const { data: readyLoan } = await db.from('loans').select('id').eq('borrower_id', b1.id).eq('status', 'fully_funded').limit(1).maybeSingle()
+  if (readyLoan) {
+    await db.from('funding_commitments').insert({
+      lender_id: l5.id, loan_id: readyLoan.id, amount: 250000, share_percent: 100,
+      expected_yield: 60000, actual_yield: 0, status: 'active',
+    })
+  }
+
+  console.log('Creating InstaPay tracker loans...')
+  const per30 = Math.round((0.05 * 365 / 30) * 10000) / 10000
+  const cash = 1_000_000
+  const earned = Math.round(cash * per30 * 10 / 365)
+  const saved = Math.round(200_000 * per30 * 20 / 365)
+  const fullInterest = Math.round(cash * per30 * 30 / 365)
+
+  await createTrackerLoan({
+    borrowerId: b1.id, lenderId: l1.id, purpose: 'personal', amount: cash, annualRate: per30,
+    daysTotal: 30, daysElapsed: 10, note: 'Cash loan. Nothing received yet, so paying today lowers the interest.',
+  })
+  await createTrackerLoan({
+    borrowerId: b1.id, lenderId: l1.id, purpose: 'other', amount: 1_800_000, annualRate: 0,
+    daysTotal: 45, daysElapsed: 15, loanKind: 'product', productName: 'iPhone 13',
+    principalPaid: 500_000, note: 'Partial', loanStatus: 'repaying',
+  })
+  await createTrackerLoan({
+    borrowerId: b1.id, lenderId: l1.id, purpose: 'personal', amount: 800_000, annualRate: per30,
+    daysTotal: 30, daysElapsed: 30, principalPaid: 800_000,
+    interestPaid: Math.round(800_000 * per30 * 30 / 365),
+    note: 'Paid in full', loanStatus: 'completed',
+  })
+  await createTrackerLoan({
+    borrowerId: b1.id, lenderId: l1.id, purpose: 'medical', amount: 600_000, annualRate: per30,
+    daysTotal: 30, daysElapsed: 10, extraDays: 15,
+    note: 'Due date extended 15 days. Interest covers the extra days.',
+  })
+  await createTrackerLoan({
+    borrowerId: b1.id, lenderId: l1.id, purpose: 'personal', amount: cash, annualRate: per30,
+    daysTotal: 30, daysElapsed: 10, principalPaid: 200_000, interestPaid: earned,
+    interestDue: fullInterest - saved, note: 'Advance', loanStatus: 'repaying',
+  })
+  await createTrackerLoan({
+    borrowerId: b2.id, lenderId: l1.id, purpose: 'business', amount: 1_500_000, annualRate: per30,
+    daysTotal: 30, daysElapsed: 23, note: 'Due in a week. An early payoff removes the last week of interest.',
+  })
+
+  const sarahLink = await ensureLoanAccess(db, b1.id, l1.id)
+  const marcusLink = await ensureLoanAccess(db, b2.id, l1.id)
+  console.log(`Sarah share link: /track/${sarahLink}`)
+  console.log(`Marcus share link: /track/${marcusLink}`)
 
   // ── Platform settings ──────────────────────────────────────────────────────
   const { count } = await db.from('platform_settings').select('*', { count: 'exact', head: true })
