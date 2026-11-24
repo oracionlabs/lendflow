@@ -9,6 +9,49 @@ import { CardSkeleton } from '@/components/shared/LoadingSkeleton'
 import type { LenderProfile } from '@lendflow/shared'
 import { BarChart2, FileText, ChevronRight } from 'lucide-react'
 
+function InstaPayQr({ profileQr }: { profileQr?: string | null }) {
+  const queryClient = useQueryClient()
+  const save = useMutation({
+    mutationFn: (qr: string | null) => api.put('/api/lender/instapay-qr', { qr }),
+    onSuccess: () => {
+      toast.success('InstaPay QR saved')
+      queryClient.invalidateQueries({ queryKey: ['lender-profile'] })
+    },
+    onError: () => toast.error('Could not save the QR'),
+  })
+
+  function onFile(file: File) {
+    if (file.size > 900_000) {
+      toast.error('Use a QR image under 900 KB')
+      return
+    }
+    const reader = new FileReader()
+    reader.onload = () => save.mutate(String(reader.result))
+    reader.readAsDataURL(file)
+  }
+
+  return (
+    <section className="card-base p-4 md:p-6 space-y-3">
+      <h2 className="font-semibold">InstaPay QR</h2>
+      <p className="text-sm text-muted-foreground">
+        Borrowers who open your loan link pay this code directly. Lendflow does not take the money. You mark each payment received on the loan.
+      </p>
+      {profileQr && <img src={profileQr} alt="InstaPay QR" className="w-48 rounded-xl border bg-white" />}
+      <div className="flex flex-col sm:flex-row gap-2">
+        <label className="min-h-11 inline-flex items-center justify-center rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground cursor-pointer">
+          {save.isPending ? 'Saving…' : 'Upload QR'}
+          <input type="file" accept="image/*" className="hidden" onChange={e => { const file = e.target.files?.[0]; if (file) onFile(file) }} />
+        </label>
+        {profileQr && (
+          <button type="button" onClick={() => save.mutate(null)} className="min-h-11 rounded-lg border px-4 text-sm font-medium hover:bg-muted">
+            Remove
+          </button>
+        )}
+      </div>
+    </section>
+  )
+}
+
 type LenderType = 'individual' | 'institutional'
 type RiskTolerance = 'conservative' | 'moderate' | 'aggressive'
 
@@ -192,6 +235,8 @@ export function LenderProfilePage() {
           <ChevronRight className="h-4 w-4 text-muted-foreground" />
         </Link>
       </div>
+
+      <InstaPayQr profileQr={profile?.instapay_qr} />
 
       {/* Document status */}
       <section className="card-base p-4 md:p-6 space-y-4">

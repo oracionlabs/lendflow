@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express'
 import { supabaseAdmin } from '../lib/supabase'
 import { assessCredit } from '../lib/credit-assessment'
+import { ensureLoanAccess } from '../lib/loan-access'
 
 const router = Router()
 
@@ -34,6 +35,24 @@ router.put('/profile', async (req: Request, res: Response): Promise<void> => {
 
   if (error) { res.status(500).json({ error: error.message }); return }
   res.json({ profile: data })
+})
+
+router.put('/instapay-qr', async (req: Request, res: Response): Promise<void> => {
+  const user = res.locals.user
+  const { qr } = req.body as { qr?: string | null }
+  if (qr && (qr.length > 1_500_000 || !/^(data:image\/[a-zA-Z0-9.+-]+;base64,|https:\/\/)/.test(qr))) {
+    res.status(400).json({ error: 'InstaPay QR must be an image or an https link' })
+    return
+  }
+  const db = supabaseAdmin()
+  const { data, error } = await db
+    .from('lender_profiles')
+    .update({ instapay_qr: qr || null })
+    .eq('user_id', user.id)
+    .select('instapay_qr')
+    .single()
+  if (error) { res.status(500).json({ error: error.message }); return }
+  res.json({ instapay_qr: data?.instapay_qr ?? null })
 })
 
 router.post('/documents', async (req: Request, res: Response): Promise<void> => {
@@ -86,7 +105,8 @@ router.get('/commitments/:id', async (req: Request, res: Response): Promise<void
         id, purpose, purpose_description, term_months, interest_rate,
         ai_credit_grade, admin_override_grade, ai_reasoning, ai_risk_factors,
         status, first_payment_date, maturity_date, amount_requested, approved_amount,
-        monthly_payment, total_repayment
+        monthly_payment, total_repayment, currency, borrower_id,
+        verification_mode, payment_channel, verification_note
       )
     `)
     .eq('id', req.params.id)
@@ -253,6 +273,7 @@ router.post('/loans/new', async (req: Request, res: Response): Promise<void> => 
     payment_frequency,
     max_term_days,
     currency,
+    waive_docs,
   } = req.body as {
     borrower_name: string
     borrower_email?: string
@@ -270,6 +291,7 @@ router.post('/loans/new', async (req: Request, res: Response): Promise<void> => 
     payment_frequency?: string
     max_term_days?: number
     currency?: string
+    waive_docs?: boolean
   }
 
   // repayment_type is the new field; payment_type is legacy — accept both
@@ -409,7 +431,10 @@ router.post('/loans/new', async (req: Request, res: Response): Promise<void> => 
     repayment_type: effectiveRepaymentType,
     payment_frequency: payment_frequency ?? null,
     max_term_days: max_term_days ?? null,
-    currency: currency ?? 'USD',
+    currency: currency ?? 'PHP',
+    verification_mode: waive_docs === false ? 'formal' : 'manual',
+    verification_note: waive_docs === false ? null : 'Lender verified this person directly and waived documents.',
+    payment_channel: 'instapay',
     amount_funded: amount_requested,
     funding_percent: 100,
     lender_count: 1,
@@ -482,7 +507,119 @@ router.post('/loans/new', async (req: Request, res: Response): Promise<void> => 
     }))
   )
 
-  res.status(201).json({ loan })
+  let access_token: string
+  try {
+    access_token = await ensureLoanAccess(db, borrowerId, lender.id)
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Could not create a share link' })
+    return
+  }
+
+  res.status(201).json({ loan, access_token })
+})
+
+router.get('/loans/:loanId/access', async (req: Request, res: Response): Promise<void> => {
+  const lender = res.locals.user
+  const db = supabaseAdmin()
+  const { data: commitment } = await db
+    .from('funding_commitments')
+    .select('loan_id, loans!inner(borrower_id, verification_mode, payment_channel)')
+    .eq('lender_id', lender.id)
+    .eq('loan_id', req.params.loanId)
+    .limit(1)
+    .maybeSingle()
+
+  if (!commitment) { res.status(404).json({ error: 'Loan not found' }); return }
+  const loan = commitment.loans as { borrower_id: string; verification_mode?: string; payment_channel?: string } | { borrower_id: string; verification_mode?: string; payment_channel?: string }[]
+  const row = Array.isArray(loan) ? loan[0] : loan
+  if (!row?.borrower_id) { res.status(404).json({ error: 'Loan not found' }); return }
+
+  try {
+    const token = await ensureLoanAccess(db, row.borrower_id, lender.id)
+    res.json({
+      access_token: token,
+      verification_mode: row.verification_mode ?? 'formal',
+      payment_channel: row.payment_channel ?? 'wallet',
+    })
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Could not create a share link' })
+  }
+})
+
+router.post('/loans/:loanId/instapay-payment', async (req: Request, res: Response): Promise<void> => {
+  const lender = res.locals.user
+  const { schedule_id } = req.body as { schedule_id?: string }
+  if (!schedule_id) { res.status(400).json({ error: 'schedule_id is required' }); return }
+
+  const db = supabaseAdmin()
+  const { data: commitment } = await db
+    .from('funding_commitments')
+    .select('id, actual_yield, loans!inner(id, borrower_id, payment_channel, status)')
+    .eq('lender_id', lender.id)
+    .eq('loan_id', req.params.loanId)
+    .limit(1)
+    .maybeSingle()
+
+  if (!commitment) { res.status(404).json({ error: 'Loan not found' }); return }
+  const loanJoin = commitment.loans as { id: string; payment_channel?: string; status: string } | { id: string; payment_channel?: string; status: string }[]
+  const loan = Array.isArray(loanJoin) ? loanJoin[0] : loanJoin
+  if (!loan || loan.payment_channel !== 'instapay') {
+    res.status(400).json({ error: 'This loan is paid through the app wallet' })
+    return
+  }
+  if (['completed', 'cancelled', 'rejected'].includes(loan.status)) {
+    res.status(400).json({ error: 'This loan is already closed' })
+    return
+  }
+
+  const { data: row } = await db
+    .from('loan_schedule')
+    .select('*')
+    .eq('id', schedule_id)
+    .eq('loan_id', req.params.loanId)
+    .maybeSingle()
+
+  if (!row) { res.status(404).json({ error: 'Payment not found' }); return }
+  if (row.status === 'paid' || row.status === 'waived') {
+    res.status(400).json({ error: 'This payment is already recorded' })
+    return
+  }
+
+  const now = new Date().toISOString()
+  const { error: payError } = await db.from('loan_schedule').update({
+    status: 'paid',
+    principal_paid: row.principal_due,
+    interest_paid: row.interest_due,
+    total_paid: row.total_due,
+    paid_at: now,
+    payment_note: 'InstaPay',
+  }).eq('id', row.id)
+
+  if (payError) { res.status(500).json({ error: payError.message }); return }
+
+  await db.from('yield_distributions').insert({
+    commitment_id: commitment.id,
+    schedule_id: row.id,
+    principal_return: row.principal_due,
+    interest_return: row.interest_due,
+    total_return: row.total_due,
+  })
+
+  const { data: remaining } = await db
+    .from('loan_schedule')
+    .select('id')
+    .eq('loan_id', req.params.loanId)
+    .not('status', 'in', '("paid","waived")')
+
+  const done = (remaining ?? []).length === 0
+  await db.from('funding_commitments').update({
+    actual_yield: (commitment.actual_yield ?? 0) + row.interest_due,
+    status: done ? 'completed' : 'repaying',
+  }).eq('id', commitment.id)
+
+  await db.from('loans').update({ status: done ? 'completed' : 'repaying' }).eq('id', req.params.loanId)
+
+  res.json({ success: true, loan_status: done ? 'completed' : 'repaying' })
 })
 
 router.post('/commitments/:id/cancel', async (req: Request, res: Response): Promise<void> => {

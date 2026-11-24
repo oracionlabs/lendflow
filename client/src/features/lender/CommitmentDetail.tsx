@@ -8,6 +8,8 @@ import { CreditGradeBadge } from '@/components/shared/CreditGradeBadge'
 import { CardSkeleton } from '@/components/shared/LoadingSkeleton'
 import { LOAN_PURPOSE_LABELS } from '@lendflow/shared'
 import { ArrowLeft, TrendingUp, XCircle } from 'lucide-react'
+import { QrImage } from '@/components/shared/QrImage'
+import type { LoanScheduleItem } from '@lendflow/shared'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 
 const CANCEL_REASONS = [
@@ -45,6 +47,10 @@ interface CommitmentDetail {
     monthly_payment: number
     total_repayment: number
     currency?: string
+    borrower_id?: string
+    verification_mode?: 'formal' | 'manual'
+    payment_channel?: 'wallet' | 'instapay'
+    verification_note?: string
   }
 }
 
@@ -68,6 +74,40 @@ export function CommitmentDetail() {
     queryFn: async () => {
       const { data } = await api.get<{ commitment: CommitmentDetail }>(`/api/lender/commitments/${id}`)
       return data.commitment
+    },
+  })
+
+  const loanId = commitment?.loans.id
+
+  const { data: access } = useQuery({
+    queryKey: ['loan-access', loanId],
+    queryFn: async () => {
+      const { data } = await api.get<{ access_token: string; payment_channel: string; verification_mode: string }>(`/api/lender/loans/${loanId}/access`)
+      return data
+    },
+    enabled: !!loanId,
+  })
+
+  const { data: schedule } = useQuery({
+    queryKey: ['lender-schedule', loanId],
+    queryFn: async () => {
+      const { data } = await api.get<{ schedule: LoanScheduleItem[] }>(`/api/loans/${loanId}/schedule`)
+      return data.schedule
+    },
+    enabled: !!loanId && (commitment?.loans.payment_channel === 'instapay' || access?.payment_channel === 'instapay'),
+  })
+
+  const markPaid = useMutation({
+    mutationFn: (scheduleId: string) => api.post(`/api/lender/loans/${loanId}/instapay-payment`, { schedule_id: scheduleId }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['lender-schedule', loanId] })
+      qc.invalidateQueries({ queryKey: ['commitment', id] })
+      qc.invalidateQueries({ queryKey: ['commitment-yields', id] })
+      toast.success('InstaPay payment recorded')
+    },
+    onError: (err: unknown) => {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Could not record the payment'
+      toast.error(msg)
     },
   })
 
@@ -233,6 +273,53 @@ export function CommitmentDetail() {
           </div>
         )}
       </div>
+
+      {access?.access_token && (
+        <section className="card-base p-4 space-y-3">
+          <h2 className="font-semibold text-sm">Share with the borrower</h2>
+          <p className="text-xs text-muted-foreground">
+            {loan.verification_mode === 'manual'
+              ? 'Documents are waived. You verified this person yourself.'
+              : 'Send this link or QR so they can open the loan on their phone.'}
+            {loan.payment_channel === 'instapay' ? ' Payments stay on your InstaPay QR. Record them here when the money arrives.' : ''}
+          </p>
+          <QrImage value={`${window.location.origin}/track/${access.access_token}`} caption="Borrower access QR" />
+          <button
+            type="button"
+            onClick={() => navigator.clipboard.writeText(`${window.location.origin}/track/${access.access_token}`).then(() => toast.success('Link copied'))}
+            className="min-h-11 rounded-lg border px-4 text-sm font-medium hover:bg-muted"
+          >
+            Copy link
+          </button>
+        </section>
+      )}
+
+      {loan.payment_channel === 'instapay' && !!schedule?.length && (
+        <section className="card-base p-4 space-y-2">
+          <h2 className="font-semibold text-sm">InstaPay payments</h2>
+          {schedule.map(row => (
+            <div key={row.id} className="flex items-center justify-between gap-3 border-b py-2 last:border-0 text-sm">
+              <div>
+                <p>#{row.installment_number} · {formatDate(row.due_date)}</p>
+                <p className="text-xs text-muted-foreground capitalize">{row.status}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="font-mono">{fmt(row.total_due)}</span>
+                {row.status !== 'paid' && row.status !== 'waived' && (
+                  <button
+                    type="button"
+                    disabled={markPaid.isPending}
+                    onClick={() => markPaid.mutate(row.id)}
+                    className="min-h-11 rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground disabled:opacity-50"
+                  >
+                    Received
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </section>
+      )}
 
       {/* Loan terms + credit — stack on mobile, side by side on desktop */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

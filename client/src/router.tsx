@@ -35,6 +35,7 @@ import { RiskMonitor } from '@/features/admin/RiskMonitor'
 import { AdminReports } from '@/features/admin/AdminReports'
 
 import { RootRedirect } from '@/features/RootRedirect'
+import { TrackLoans } from '@/features/track/TrackLoans'
 
 export const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
@@ -91,6 +92,7 @@ export const router = createBrowserRouter([
     }],
   },
 
+  { path: '/track/:token', element: <TrackLoans /> },
   { path: '/', element: <RootRedirect /> },
   { path: '*', element: <Navigate to="/" replace /> },
 ])

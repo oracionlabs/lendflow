@@ -38,13 +38,15 @@ export function ActiveLoanDetail() {
   const [cancelReason, setCancelReason] = useState(CANCEL_REASONS[0])
   const [cancelOther, setCancelOther] = useState('')
 
-  const { data: loanData, isLoading: loanLoading } = useQuery({
+  const { data: loanPayload, isLoading: loanLoading } = useQuery({
     queryKey: ['loan', id],
     queryFn: async () => {
-      const { data } = await api.get<{ loan: Loan }>(`/api/loans/${id}`)
-      return data.loan
+      const { data } = await api.get<{ loan: Loan; instapay_qr?: string | null }>(`/api/loans/${id}`)
+      return data
     },
   })
+  const loanData = loanPayload?.loan
+  const instapayQr = loanPayload?.instapay_qr
 
   const { data: schedule, isLoading: schedLoading } = useQuery({
     queryKey: ['loan-schedule', id],
@@ -218,7 +220,17 @@ export function ActiveLoanDetail() {
             </div>
           </div>
 
-          {nextDue && loan.status !== 'completed' && (
+          {nextDue && loan.status !== 'completed' && loan.payment_channel === 'instapay' && (
+            <div className="card-base p-5 space-y-3">
+              <p className="font-semibold">Pay with InstaPay</p>
+              <p className="text-sm text-muted-foreground">
+                Send {fmt(nextDue.total_due + nextDue.late_fee)} to your lender by {formatDate(nextDue.due_date)}. The money does not go through this app. Your lender records it when it arrives.
+              </p>
+              {instapayQr && <img src={instapayQr} alt="Lender InstaPay QR" className="w-56 rounded-xl border bg-white" />}
+            </div>
+          )}
+
+          {nextDue && loan.status !== 'completed' && loan.payment_channel !== 'instapay' && (
             <div className="card-base p-5 space-y-4">
               <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                 <div>

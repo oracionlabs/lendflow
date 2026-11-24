@@ -48,6 +48,7 @@ export interface LenderProfile {
   accredited: boolean
   risk_tolerance?: RiskTolerance
   identity_verified: boolean
+  instapay_qr?: string | null
   created_at: string
   updated_at: string
 }

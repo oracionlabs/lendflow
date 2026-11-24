@@ -188,7 +188,25 @@ router.get('/:id', async (req: Request, res: Response): Promise<void> => {
     return
   }
 
-  res.json({ loan })
+  let instapay_qr: string | null = null
+  if (loan.payment_channel === 'instapay') {
+    const { data: commit } = await db
+      .from('funding_commitments')
+      .select('lender_id')
+      .eq('loan_id', loan.id)
+      .limit(1)
+      .maybeSingle()
+    if (commit?.lender_id) {
+      const { data: lenderProfile } = await db
+        .from('lender_profiles')
+        .select('instapay_qr')
+        .eq('user_id', commit.lender_id)
+        .maybeSingle()
+      instapay_qr = lenderProfile?.instapay_qr ?? null
+    }
+  }
+
+  res.json({ loan, instapay_qr })
 })
 
 router.put('/:id', requireBorrower, async (req: Request, res: Response): Promise<void> => {

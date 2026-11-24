@@ -2,7 +2,8 @@ import { useState, useMemo, useRef } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import api from '@/lib/api'
-import { formatCents, useCurrencySymbol } from '@/lib/utils'
+import { formatCents, useCurrency, useCurrencySymbol } from '@/lib/utils'
+import { QrImage } from '@/components/shared/QrImage'
 import { toast } from 'sonner'
 import { LOAN_PURPOSE_LABELS, CURRENCIES } from '@lendflow/shared'
 import { CheckCircle2, Upload, X, ArrowRight, ArrowLeft } from 'lucide-react'
@@ -48,7 +49,7 @@ const INITIAL: Form = {
   term_months: 12,
   payment_frequency: 'monthly',
   max_term_days: 90,
-  currency: 'USD',
+  currency: 'PHP',
 }
 
 const RATE_OPTIONS: { value: RatePeriod; label: string; desc: string }[] = [
@@ -98,9 +99,12 @@ function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
 
 export function LoanOrigination() {
   const symbol = useCurrencySymbol()
+  const platformCurrency = useCurrency()
   const navigate = useNavigate()
   const [step, setStep] = useState<Step>(1)
-  const [form, setForm] = useState<Form>(INITIAL)
+  const [form, setForm] = useState<Form>({ ...INITIAL, currency: platformCurrency || 'PHP' })
+  const [waiveDocs, setWaiveDocs] = useState(true)
+  const [accessToken, setAccessToken] = useState<string | null>(null)
   const [dueDateMode, setDueDateMode] = useState<'days' | 'date'>('days')
   const [receipt, setReceipt] = useState<File | null>(null)
   const [receiptPreview, setReceiptPreview] = useState<string | null>(null)
@@ -225,10 +229,14 @@ export function LoanOrigination() {
         payment_frequency: form.payment_type === 'custom_schedule' ? form.payment_frequency : undefined,
         max_term_days: form.payment_type === 'daily_interest' ? form.max_term_days : undefined,
         currency: form.currency,
+        waive_docs: waiveDocs,
       })
-      return data
+      return data as { access_token?: string }
     },
-    onSuccess: () => setDone(true),
+    onSuccess: (data) => {
+      setAccessToken(data.access_token ?? null)
+      setDone(true)
+    },
     onError: (err: unknown) => {
       const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Something went wrong'
       toast.error(msg)
@@ -274,13 +282,28 @@ export function LoanOrigination() {
           </p>
           <p className="text-sm text-muted-foreground mt-2">
             {form.borrower_name}'s repayment schedule is now active.
+            {waiveDocs ? ' Documents were waived because you verified them yourself.' : ''}
           </p>
         </div>
+        {accessToken && (
+          <div className="card-base p-4 space-y-3 text-left">
+            <p className="text-sm font-semibold">Share this with {form.borrower_name}</p>
+            <p className="text-xs text-muted-foreground">They can open their loans from this link or QR. They pay you by InstaPay. You mark each payment received.</p>
+            <QrImage value={`${window.location.origin}/track/${accessToken}`} caption="Loan access QR" />
+            <button
+              type="button"
+              onClick={() => navigator.clipboard.writeText(`${window.location.origin}/track/${accessToken}`).then(() => toast.success('Link copied'))}
+              className="w-full min-h-11 rounded-lg border text-sm font-medium hover:bg-muted"
+            >
+              Copy link
+            </button>
+          </div>
+        )}
         <div className="flex gap-3">
           <button onClick={() => navigate('/lender')} className="flex-1 rounded-lg bg-primary py-2.5 text-sm font-semibold text-white hover:bg-primary/90">
             Go to Portfolio
           </button>
-          <button onClick={() => { setDone(false); setStep(1); setForm(INITIAL); setReceipt(null); setReceiptPreview(null) }} className="flex-1 rounded-lg border py-2.5 text-sm font-medium hover:bg-muted">
+          <button onClick={() => { setDone(false); setStep(1); setForm({ ...INITIAL, currency: platformCurrency || 'PHP' }); setReceipt(null); setReceiptPreview(null); setAccessToken(null); setWaiveDocs(true) }} className="flex-1 rounded-lg border py-2.5 text-sm font-medium hover:bg-muted">
             New Loan
           </button>
         </div>
@@ -580,12 +603,28 @@ export function LoanOrigination() {
             </div>
           </div>
 
+          <label className="flex items-start gap-3 rounded-xl border p-4 text-left">
+            <input
+              type="checkbox"
+              checked={waiveDocs}
+              onChange={e => setWaiveDocs(e.target.checked)}
+              className="mt-1"
+            />
+            <span>
+              <span className="block text-sm font-semibold">Waive documents. I verified this person myself.</span>
+              <span className="block text-xs text-muted-foreground mt-1">
+                Use this when you already talked in chat. The formal application still asks borrowers for documents. This loan is only a tracker.
+              </span>
+            </span>
+          </label>
+
           <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
-            <p className="text-sm font-semibold text-amber-900">Send the funds now</p>
+            <p className="text-sm font-semibold text-amber-900">Money stays in your own channels</p>
             <p className="text-sm text-amber-800 mt-1">
-              Transfer <span className="font-bold">{formatCents(form.amount)}</span> to{' '}
-              <span className="font-bold">{form.borrower_name}</span> before continuing.
-              Once you've sent the money, click Continue to upload the receipt.
+              Send <span className="font-bold">{formatCents(form.amount, form.currency)}</span> to{' '}
+              <span className="font-bold">{form.borrower_name}</span> the way you already do.
+              They repay you by InstaPay. Lendflow records the schedule and does not hold the payment.
+              A receipt photo is optional.
             </p>
           </div>
         </div>
@@ -595,9 +634,9 @@ export function LoanOrigination() {
       {step === 4 && (
         <div className="space-y-4">
           <div className="card-base p-4 sm:p-6 space-y-4">
-            <h2 className="font-semibold">Upload transfer receipt</h2>
+            <h2 className="font-semibold">Transfer receipt, if you have one</h2>
             <p className="text-sm text-muted-foreground">
-              Attach a screenshot or photo of the transfer confirmation.
+              Optional. Attach a screenshot if you want it on the loan. You can save the loan without it.
             </p>
 
             {!receipt ? (
@@ -645,10 +684,10 @@ export function LoanOrigination() {
 
           <button
             onClick={() => create.mutate()}
-            disabled={!receipt || create.isPending}
+            disabled={create.isPending}
             className="w-full rounded-lg bg-primary py-3 text-sm font-semibold text-white hover:bg-primary/90 disabled:opacity-50 shadow-sm transition-colors"
           >
-            {create.isPending ? 'Saving…' : 'Finalise Loan'}
+            {create.isPending ? 'Saving…' : 'Save loan and get share link'}
           </button>
         </div>
       )}

@@ -35,6 +35,8 @@ export type ScheduleStatus =
 
 export interface Loan {
   currency?: string
+  verification_mode?: 'formal' | 'manual'
+  payment_channel?: 'wallet' | 'instapay'
   repayment_type?: import('./package.types').RepaymentType
   package_id?: string | null
   payment_frequency?: import('./package.types').PaymentFrequency | null

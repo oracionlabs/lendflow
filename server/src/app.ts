@@ -21,6 +21,7 @@ import notificationsRouter from './routes/notifications'
 import reportsRouter from './routes/reports'
 import listingsRouter from './routes/listings'
 import adminRouter from './routes/admin/index'
+import trackRouter from './routes/track'
 
 const ALLOWED_ORIGINS = [
   'http://localhost:5173',
@@ -32,7 +33,7 @@ export function createApp() {
 
   app.use(helmet())
   app.use(cors({ origin: ALLOWED_ORIGINS, credentials: true }))
-  app.use(express.json())
+  app.use(express.json({ limit: '2mb' }))
   app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'))
 
   app.get('/health', (_req, res) => res.json({ ok: true, service: 'lendflow-api' }))
@@ -44,6 +45,7 @@ export function createApp() {
   })
 
   app.use('/api/auth', authRouter)
+  app.use('/api/track', trackRouter)
 
   app.use('/api/users', requireAuth, usersRouter)
   app.use('/api/borrower', requireAuth, requireBorrower, borrowerRouter)
