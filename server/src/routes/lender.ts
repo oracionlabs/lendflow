@@ -84,7 +84,10 @@ router.get('/commitments', async (req: Request, res: Response): Promise<void> =>
       loans (
         id, purpose, term_months, interest_rate, ai_credit_grade,
         admin_override_grade, status, first_payment_date, maturity_date,
-        amount_requested, approved_amount
+        amount_requested, approved_amount, monthly_payment, currency,
+        loan_kind, product_name,
+        users!borrower_id (name),
+        loan_schedule (installment_number, due_date, total_due, total_paid, status)
       )
     `)
     .eq('lender_id', user.id)

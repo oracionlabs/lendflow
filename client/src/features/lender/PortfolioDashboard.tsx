@@ -2,12 +2,11 @@ import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import api from '@/lib/api'
 import { useAuth } from '@/context/AuthContext'
-import { formatCents, formatPercent, useCurrency } from '@/lib/utils'
+import { formatCents, useCurrency } from '@/lib/utils'
 import { CardSkeleton } from '@/components/shared/LoadingSkeleton'
-import { CreditGradeBadge } from '@/components/shared/CreditGradeBadge'
-import { LOAN_PURPOSE_LABELS } from '@lendflow/shared'
+import { CommitmentCard, type DashboardLoan } from '@/features/lender/CommitmentCard'
 import type { FundingCommitment } from '@lendflow/shared'
-import { ChevronRight, TrendingUp, Users, Settings2 } from 'lucide-react'
+import { ChevronRight, TrendingUp, Settings2 } from 'lucide-react'
 
 const RATE_PERIOD_LABELS: Record<string, string> = {
   per_15_days: '/ 15 days', per_30_days: '/ 30 days',
@@ -25,7 +24,7 @@ interface Listing {
 }
 
 interface CommitmentWithLoan extends FundingCommitment {
-  loans: { purpose: string; term_months: number; interest_rate: number; ai_credit_grade?: string; admin_override_grade?: string; status: string }
+  loans: DashboardLoan
 }
 
 interface LoanRequest { id: string; amount_requested: number; purpose: string; status: string; users: { name: string } | null }
@@ -170,21 +169,12 @@ export function PortfolioDashboard() {
             <Link to="/lender/loans" className="text-xs text-primary">View all</Link>
           </div>
           <div className="space-y-2">
-            {(commitments ?? []).filter(c => c.status === 'active').slice(0, 3).map(c => (
-              <Link key={c.id} to={`/lender/commitments/${c.id}`}
-                className="flex items-center justify-between card-base p-4 active:scale-[0.99] transition-transform">
-                <div>
-                  <p className="font-medium text-sm">{LOAN_PURPOSE_LABELS[c.loans?.purpose] ?? c.loans?.purpose}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {formatCents(c.amount)} · {formatPercent(c.loans?.interest_rate ?? 0)}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <CreditGradeBadge grade={c.loans?.admin_override_grade ?? c.loans?.ai_credit_grade} />
-                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                </div>
-              </Link>
-            ))}
+            {(commitments ?? [])
+              .filter(c => ['active', 'repaying'].includes(c.status) || ['active', 'repaying', 'funding', 'fully_funded'].includes(c.loans?.status))
+              .slice(0, 5)
+              .map(c => (
+                <CommitmentCard key={c.id} id={c.id} amount={c.amount} loan={c.loans} />
+              ))}
           </div>
         </section>
       )}

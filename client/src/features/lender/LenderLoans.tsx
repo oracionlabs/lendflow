@@ -1,20 +1,14 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import api from '@/lib/api'
-import { formatCents, formatPercent, formatDate, useCurrency } from '@/lib/utils'
-import { StatusBadge } from '@/components/shared/StatusBadge'
+import { useCurrency } from '@/lib/utils'
 import { CardSkeleton } from '@/components/shared/LoadingSkeleton'
-import { LOAN_PURPOSE_LABELS } from '@lendflow/shared'
-import type { FundingCommitment, LoanStatus } from '@lendflow/shared'
-import { ChevronRight, TrendingUp } from 'lucide-react'
+import { CommitmentCard, type DashboardLoan } from '@/features/lender/CommitmentCard'
+import type { FundingCommitment } from '@lendflow/shared'
+import { TrendingUp } from 'lucide-react'
 
 interface CommitmentWithLoan extends FundingCommitment {
-  loans: {
-    id: string; purpose: string; term_months: number; interest_rate: number
-    ai_credit_grade?: string; admin_override_grade?: string
-    status: string; first_payment_date?: string; maturity_date?: string
-    amount_requested: number; approved_amount: number
-  }
+  loans: DashboardLoan
 }
 
 export function LenderLoans() {
@@ -37,24 +31,8 @@ export function LenderLoans() {
   const active = commitments?.filter(c => ACTIVE.includes(c.status) || ['active', 'repaying', 'approved', 'funding', 'fully_funded'].includes((c.loans as { status?: string })?.status ?? '')) ?? []
   const other = commitments?.filter(c => !active.includes(c)) ?? []
 
-  function CommitmentCard({ c }: { c: CommitmentWithLoan }) {
-    const loan = c.loans
-    return (
-      <Link to={`/lender/commitments/${c.id}`}
-        className="flex items-center justify-between card-base p-4 active:scale-[0.99] transition-transform">
-        <div className="min-w-0">
-          <p className="font-medium text-sm">{LOAN_PURPOSE_LABELS[loan?.purpose] ?? loan?.purpose}</p>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            {formatCents(c.amount)} · {formatPercent(loan?.interest_rate ?? 0)}
-            {loan?.maturity_date ? ` · Matures ${formatDate(loan.maturity_date)}` : ''}
-          </p>
-        </div>
-        <div className="flex items-center gap-2 flex-shrink-0 ml-3">
-          <StatusBadge status={(loan?.status ?? c.status) as LoanStatus} />
-          <ChevronRight className="h-4 w-4 text-muted-foreground" />
-        </div>
-      </Link>
-    )
+  function LoanRow({ c }: { c: CommitmentWithLoan }) {
+    return <CommitmentCard id={c.id} amount={c.amount} loan={c.loans} />
   }
 
   return (
@@ -83,7 +61,7 @@ export function LenderLoans() {
             <section>
               <h2 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-2">Active</h2>
               <div className="space-y-2">
-                {active.map(c => <CommitmentCard key={c.id} c={c} />)}
+                {active.map(c => <LoanRow key={c.id} c={c} />)}
               </div>
             </section>
           )}
@@ -91,7 +69,7 @@ export function LenderLoans() {
             <section>
               <h2 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-2">Other</h2>
               <div className="space-y-2">
-                {other.map(c => <CommitmentCard key={c.id} c={c} />)}
+                {other.map(c => <LoanRow key={c.id} c={c} />)}
               </div>
             </section>
           )}
