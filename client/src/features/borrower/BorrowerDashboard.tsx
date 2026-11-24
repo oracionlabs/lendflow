@@ -32,11 +32,11 @@ export function BorrowerDashboard() {
   const daysLeft = nextPayment?.first_payment_date ? daysUntil(nextPayment.first_payment_date) : null
 
   return (
-    <div className="max-w-lg mx-auto space-y-5">
+    <div className="max-w-4xl mx-auto space-y-7">
       {/* Greeting */}
       <div>
-        <h1 className="text-xl font-bold">Hi, {user?.name?.split(' ')[0]} 👋</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
+        <h1 className="page-heading">Hi, {user?.name?.split(' ')[0]} 👋</h1>
+        <p className="text-sm text-muted-foreground mt-1.5">
           {loans?.length === 0 ? 'Ready to find a lender?' : `You have ${activeLoans.length} active loan${activeLoans.length !== 1 ? 's' : ''}`}
         </p>
       </div>
@@ -44,13 +44,13 @@ export function BorrowerDashboard() {
       {/* Next payment card */}
       {nextPayment && daysLeft !== null && (
         <Link to={`/borrower/loans/${nextPayment.id}`}
-          className={`block rounded-2xl p-5 text-white shadow-card-md active:scale-[0.99] transition-transform ${
-            daysLeft <= 3 ? 'bg-red-500' : 'bg-primary'
+          className={`block rounded-2xl p-5 md:p-6 text-white shadow-card-md active:scale-[0.99] transition-transform ${
+            daysLeft <= 3 ? 'bg-red-500' : 'bg-gradient-to-br from-primary to-violet-700'
           }`}>
           <p className="text-xs text-white/70 font-medium uppercase tracking-wide">
             {daysLeft <= 0 ? 'Payment due today' : `Payment in ${daysLeft} day${daysLeft !== 1 ? 's' : ''}`}
           </p>
-          <p className="text-3xl font-bold mt-1">{formatCents(nextPayment.monthly_payment ?? 0)}</p>
+          <p className="text-3xl sm:text-4xl font-bold mt-1 tabular-nums">{formatCents(nextPayment.monthly_payment ?? 0)}</p>
           <div className="flex items-center justify-between mt-2">
             <p className="text-sm text-white/80">
               {LOAN_PURPOSE_LABELS[nextPayment.purpose] ?? nextPayment.purpose}
@@ -82,10 +82,10 @@ export function BorrowerDashboard() {
             <h2 className="font-semibold text-sm">Applications</h2>
             <Link to="/borrower/loans" className="text-xs text-primary">View all</Link>
           </div>
-          <div className="space-y-2">
+          <div className="grid gap-3 sm:grid-cols-2">
             {pendingApps.map(loan => (
               <Link key={loan.id} to={`/borrower/loans/${loan.id}`}
-                className="flex items-center justify-between gap-3 card-base p-4 active:scale-[0.99] transition-transform">
+                className="flex items-center justify-between gap-3 card-base interactive-card p-4">
                 <div className="min-w-0">
                   <p className="font-medium text-sm truncate">{LOAN_PURPOSE_LABELS[loan.purpose] ?? loan.purpose}</p>
                   <p className="text-xs text-muted-foreground">{formatCents(loan.amount_requested)} · {loan.term_months}mo</p>
@@ -114,10 +114,10 @@ export function BorrowerDashboard() {
             <h2 className="font-semibold text-sm">Active Loans</h2>
             <Link to="/borrower/loans" className="text-xs text-primary">View all</Link>
           </div>
-          <div className="space-y-2">
+          <div className="grid gap-3 sm:grid-cols-2">
             {activeLoans.map(loan => (
               <Link key={loan.id} to={`/borrower/loans/${loan.id}`}
-                className="flex items-center justify-between gap-3 card-base p-4 active:scale-[0.99] transition-transform">
+                className="flex items-center justify-between gap-3 card-base interactive-card p-4">
                 <div className="min-w-0">
                   <p className="font-medium text-sm truncate">{LOAN_PURPOSE_LABELS[loan.purpose] ?? loan.purpose}</p>
                   <p className="text-xs text-muted-foreground">

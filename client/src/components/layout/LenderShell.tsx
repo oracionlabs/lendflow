@@ -20,21 +20,21 @@ export function LenderShell() {
   return (
     <div className="flex h-dvh bg-background">
       {/* Desktop sidebar — dark */}
-      <aside className="hidden md:flex w-56 flex-shrink-0 flex-col bg-sidebar shadow-xl">
-        <div className="px-5 py-5 border-b border-white/10">
+      <aside className="hidden md:flex w-64 flex-shrink-0 flex-col bg-sidebar">
+        <div className="px-6 py-6">
           <div className="flex items-center gap-2">
-            <div className="h-7 w-7 rounded-xl bg-primary flex items-center justify-center">
-              <span className="text-xs font-bold text-white">L</span>
+            <div className="h-8 w-8 rounded-xl bg-lime flex items-center justify-center shadow-sm">
+              <span className="text-xs font-bold text-lime-foreground">L</span>
             </div>
             <span className="font-bold text-base tracking-tight text-white">LendFlow</span>
           </div>
-          <p className="text-[11px] text-white/40 mt-1 ml-9">Capital Partner Portal</p>
+          <p className="text-[11px] text-white/45 mt-1 ml-10 tracking-wide">Capital Partner Portal</p>
         </div>
-        <nav className="flex-1 px-3 py-3 space-y-0.5">
+        <nav className="flex-1 px-3 py-4 space-y-1">
           {navItems.map(({ to, label, icon: Icon, end }) => (
             <NavLink key={to} to={to} end={end}
               className={({ isActive }) => cn(
-                'flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium transition-all',
+                'flex min-h-11 items-center gap-3 rounded-xl px-3.5 text-sm font-medium transition-all',
                 isActive
                   ? 'bg-primary text-white shadow-sm'
                   : 'text-white/60 hover:bg-white/10 hover:text-white'
@@ -44,7 +44,7 @@ export function LenderShell() {
             </NavLink>
           ))}
         </nav>
-        <div className="px-3 py-3 border-t border-white/10">
+        <div className="px-3 py-4 border-t border-white/10">
           <div className="flex items-center gap-2.5 px-3 py-2 mb-0.5">
             <div className="h-7 w-7 rounded-full bg-white/10 flex items-center justify-center flex-shrink-0">
               <span className="text-xs font-bold text-white">{initial}</span>
@@ -63,7 +63,7 @@ export function LenderShell() {
 
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header */}
-        <header className="bg-background border-b border-border flex items-center justify-between gap-2 px-3 md:px-6 shadow-sm sticky top-0 z-30 pt-[env(safe-area-inset-top)] min-h-14">
+        <header className="bg-background/85 backdrop-blur-xl border-b border-border/70 flex items-center justify-between gap-2 px-3 md:px-8 sticky top-0 z-30 pt-[env(safe-area-inset-top)] min-h-16">
           <div className="flex items-center gap-2 md:hidden min-w-0">
             <div className="h-6 w-6 rounded-lg bg-primary flex items-center justify-center shrink-0">
               <span className="text-[10px] font-bold text-white">L</span>
@@ -97,12 +97,12 @@ export function LenderShell() {
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 pb-24 md:p-6 md:pb-6">
+        <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 pb-24 md:p-8 md:pb-10">
           <Outlet />
         </main>
 
         {/* Mobile bottom nav */}
-        <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 border-t border-border bg-background/95 backdrop-blur pb-[env(safe-area-inset-bottom)]">
+        <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 border-t border-border/70 bg-background/90 backdrop-blur-xl pb-[env(safe-area-inset-bottom)]">
           <div className="flex">
             {navItems.map(({ to, label, icon: Icon, end }) => (
               <NavLink key={to} to={to} end={end}

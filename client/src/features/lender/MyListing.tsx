@@ -186,17 +186,17 @@ export function MyListing() {
   const listingId = (existing as { id?: string } | null)?.id
 
   if (isLoading) {
-    return <div className="max-w-lg mx-auto space-y-4 animate-pulse">
+    return <div className="max-w-2xl mx-auto space-y-4 animate-pulse">
       {Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-32 rounded-xl bg-muted" />)}
     </div>
   }
 
   return (
-    <div className="max-w-lg mx-auto space-y-5">
+    <div className="max-w-2xl mx-auto space-y-7">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold">My Listing</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
+          <h1 className="page-heading">My Listing</h1>
+          <p className="text-sm text-muted-foreground mt-1.5">
             {existing ? 'Your listing is visible to borrowers' : 'Publish your terms so borrowers can find you'}
           </p>
         </div>
@@ -213,7 +213,7 @@ export function MyListing() {
       </div>
 
       {/* Capital */}
-      <div className="card-base p-5 space-y-4">
+      <div className="card-base p-5 sm:p-7 space-y-4">
         <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Capital</h2>
         <div>
           <label className="block text-sm font-medium mb-1.5">Currency</label>
@@ -249,7 +249,7 @@ export function MyListing() {
       </div>
 
       {/* Default Rate */}
-      <div className="card-base p-5 space-y-4">
+      <div className="card-base p-5 sm:p-7 space-y-4">
         <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Default Interest Rate</h2>
         <div className="relative">
           <input type="number" value={(form.interest_rate * 100) || ''}
@@ -269,7 +269,7 @@ export function MyListing() {
       </div>
 
       {/* Terms */}
-      <div className="card-base p-5 space-y-4">
+      <div className="card-base p-5 sm:p-7 space-y-4">
         <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Terms</h2>
         <div>
           <label className="block text-sm font-medium mb-1.5">Max loan duration (months) <span className="text-muted-foreground font-normal">optional</span></label>
@@ -304,7 +304,7 @@ export function MyListing() {
 
       {/* ─── Packages (only shown after listing is saved) ─── */}
       {listingId && (
-        <div className="card-base p-5 space-y-4">
+        <div className="card-base p-5 sm:p-7 space-y-4">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="font-semibold">Loan Packages</h2>

@@ -2,12 +2,13 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import api from '@/lib/api'
 import { toast } from 'sonner'
-import { formatCents, useCurrency } from '@/lib/utils'
+import { formatCents, useCurrency, useCurrencySymbol } from '@/lib/utils'
 import { CURRENCIES, type PlatformSettings } from '@lendflow/shared'
 import { LoadingSkeleton } from '@/components/shared/LoadingSkeleton'
 
 export function PlatformSettings() {
   useCurrency() // subscribe to currency changes
+  const symbol = useCurrencySymbol()
   const qc = useQueryClient()
   const [editing, setEditing] = useState(false)
   const [form, setForm] = useState<Partial<PlatformSettings>>({})
@@ -42,23 +43,26 @@ export function PlatformSettings() {
   if (isLoading) return <LoadingSkeleton lines={10} />
 
   return (
-    <div className="max-w-2xl space-y-8">
+    <div className="mx-auto max-w-4xl space-y-7">
       <div className="flex items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold">Platform Settings</h1>
+        <div>
+          <h1 className="page-heading">Platform Settings</h1>
+          <p className="mt-1.5 text-sm text-muted-foreground">Set defaults for new loans across LendFlow.</p>
+        </div>
         {!editing && (
-          <button onClick={handleEdit} className="min-h-11 shrink-0 rounded-md border px-4 text-sm font-medium hover:bg-accent transition-colors">
+          <button onClick={handleEdit} className="button-secondary shrink-0">
             Edit Settings
           </button>
         )}
       </div>
 
-      <div className="rounded-lg border bg-amber-50 border-amber-200 p-3 text-xs text-amber-800">
+      <div className="rounded-xl border bg-amber-50 border-amber-200 p-4 text-xs text-amber-800">
         Changes apply to new loans only. Existing loans retain their original terms.
       </div>
 
       {editing ? (
         <form onSubmit={e => { e.preventDefault(); save.mutate(form) }} className="space-y-6">
-          <section className="space-y-4">
+          <section className="card-base p-5 sm:p-6 space-y-4">
             <h2 className="font-semibold">Currency</h2>
             <div>
               <label className="block text-sm font-medium mb-1.5">Platform Currency</label>
@@ -73,7 +77,7 @@ export function PlatformSettings() {
             </div>
           </section>
 
-          <section className="space-y-4">
+          <section className="card-base p-5 sm:p-6 space-y-4">
             <h2 className="font-semibold">Fees</h2>
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -83,7 +87,7 @@ export function PlatformSettings() {
                   className="w-full rounded-md border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1.5">Late Fee Flat ($)</label>
+                <label className="block text-sm font-medium mb-1.5">Late Fee Flat ({symbol})</label>
                 <input type="number" step="1" value={(form.late_fee_flat ?? 0) / 100}
                   onChange={e => setForm(f => ({ ...f, late_fee_flat: Math.round(parseFloat(e.target.value) * 100) }))}
                   className="w-full rounded-md border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" />
@@ -103,23 +107,23 @@ export function PlatformSettings() {
             </div>
           </section>
 
-          <section className="space-y-4">
+          <section className="card-base p-5 sm:p-6 space-y-4">
             <h2 className="font-semibold">Loan Limits</h2>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium mb-1.5">Min Loan Amount ($)</label>
+                <label className="block text-sm font-medium mb-1.5">Min Loan Amount ({symbol})</label>
                 <input type="number" value={(form.min_loan_amount ?? 0) / 100}
                   onChange={e => setForm(f => ({ ...f, min_loan_amount: Math.round(parseFloat(e.target.value) * 100) }))}
                   className="w-full rounded-md border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1.5">Max Loan Amount ($)</label>
+                <label className="block text-sm font-medium mb-1.5">Max Loan Amount ({symbol})</label>
                 <input type="number" value={(form.max_loan_amount ?? 0) / 100}
                   onChange={e => setForm(f => ({ ...f, max_loan_amount: Math.round(parseFloat(e.target.value) * 100) }))}
                   className="w-full rounded-md border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1.5">Min Commitment ($)</label>
+                <label className="block text-sm font-medium mb-1.5">Min Commitment ({symbol})</label>
                 <input type="number" value={(form.min_commitment_amount ?? 0) / 100}
                   onChange={e => setForm(f => ({ ...f, min_commitment_amount: Math.round(parseFloat(e.target.value) * 100) }))}
                   className="w-full rounded-md border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" />
@@ -127,7 +131,7 @@ export function PlatformSettings() {
             </div>
           </section>
 
-          <section className="space-y-3">
+          <section className="card-base p-5 sm:p-6 space-y-3">
             <h2 className="font-semibold">Interest Rates by Credit Grade</h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
               {['A', 'B', 'C', 'D', 'E'].map(grade => (
@@ -149,25 +153,25 @@ export function PlatformSettings() {
 
           <div className="flex gap-3">
             <button type="submit" disabled={save.isPending}
-              className="min-h-11 rounded-md bg-primary px-6 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
+              className="button-primary px-6">
               {save.isPending ? 'Saving…' : 'Save Settings'}
             </button>
             <button type="button" onClick={() => setEditing(false)}
-              className="min-h-11 rounded-md border px-4 text-sm font-medium hover:bg-accent">
+              className="button-secondary">
               Cancel
             </button>
           </div>
         </form>
       ) : (
         <div className="space-y-6 text-sm">
-          <section className="space-y-3">
+          <section className="card-base p-5 sm:p-6 space-y-3">
             <h2 className="font-semibold">Currency</h2>
             <div className="flex flex-col gap-0.5 sm:flex-row sm:gap-4 py-2">
               <span className="sm:w-48 text-muted-foreground">Platform Currency</span>
               <span className="font-medium">{CURRENCIES.find(c => c.code === ((settings as Record<string, unknown> | undefined)?.currency as string ?? 'USD'))?.label ?? 'USD — US Dollar ($)'}</span>
             </div>
           </section>
-          <section className="space-y-3">
+          <section className="card-base p-5 sm:p-6 space-y-3">
             <h2 className="font-semibold">Fees & Rules</h2>
             {[
               { label: 'Origination Fee', value: `${((settings?.origination_fee_percent ?? 0) * 100).toFixed(2)}%` },
@@ -181,7 +185,7 @@ export function PlatformSettings() {
               </div>
             ))}
           </section>
-          <section className="space-y-3">
+          <section className="card-base p-5 sm:p-6 space-y-3">
             <h2 className="font-semibold">Loan Limits</h2>
             {[
               { label: 'Min Loan', value: formatCents(settings?.min_loan_amount ?? 0) },
@@ -194,7 +198,7 @@ export function PlatformSettings() {
               </div>
             ))}
           </section>
-          <section>
+          <section className="card-base p-5 sm:p-6">
             <h2 className="font-semibold mb-3">Interest Rates by Grade</h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
               {['A', 'B', 'C', 'D', 'E'].map(g => (

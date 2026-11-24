@@ -84,7 +84,7 @@ export function LenderProfilePage() {
 
   if (isLoading) {
     return (
-      <div className="space-y-6 max-w-2xl">
+      <div className="space-y-6 max-w-4xl mx-auto">
         <CardSkeleton />
         <CardSkeleton />
       </div>
@@ -106,23 +106,23 @@ export function LenderProfilePage() {
     (riskTolerance && riskTolerance !== profile?.risk_tolerance)
 
   return (
-    <div className="space-y-8 max-w-2xl">
+    <div className="space-y-8 max-w-4xl mx-auto">
       <div>
-        <h1 className="text-2xl font-bold">Lender Profile</h1>
-        <p className="text-muted-foreground mt-1">Manage your lending preferences</p>
+        <h1 className="page-heading">Lender Profile</h1>
+        <p className="text-muted-foreground mt-1.5 text-sm">Manage your lending preferences and payment details.</p>
       </div>
 
       {/* Account info */}
       <section className="card-base p-4 md:p-6 space-y-4">
         <h2 className="font-semibold">Account Information</h2>
-        <div className="grid grid-cols-2 gap-4 text-sm">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
           <div>
             <p className="text-muted-foreground text-xs mb-1">Full Name</p>
             <p className="font-medium">{user?.name}</p>
           </div>
           <div>
             <p className="text-muted-foreground text-xs mb-1">Email</p>
-            <p className="font-medium">{user?.email}</p>
+            <p className="font-medium break-all">{user?.email}</p>
           </div>
           <div>
             <p className="text-muted-foreground text-xs mb-1">Member Since</p>
@@ -219,7 +219,7 @@ export function LenderProfilePage() {
       {/* Quick links */}
       <div className="space-y-2">
         <Link to="/lender/listing"
-          className="flex items-center justify-between card-base p-4 hover:bg-muted/30 transition-colors">
+          className="flex items-center justify-between card-base interactive-card p-4">
           <div className="flex items-center gap-3">
             <FileText className="h-5 w-5 text-primary" />
             <span className="font-medium text-sm">My Listing</span>
@@ -227,7 +227,7 @@ export function LenderProfilePage() {
           <ChevronRight className="h-4 w-4 text-muted-foreground" />
         </Link>
         <Link to="/lender/reports"
-          className="flex items-center justify-between card-base p-4 hover:bg-muted/30 transition-colors">
+          className="flex items-center justify-between card-base interactive-card p-4">
           <div className="flex items-center gap-3">
             <BarChart2 className="h-5 w-5 text-primary" />
             <span className="font-medium text-sm">Reports & Analytics</span>

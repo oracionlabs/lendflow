@@ -96,7 +96,7 @@ function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
       {...props}
-      className={`w-full min-h-11 rounded-lg border bg-card px-3 py-2.5 text-base sm:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary placeholder:text-muted-foreground/60 ${props.className ?? ''}`}
+      className={`w-full min-h-11 rounded-xl border bg-card px-3.5 py-2.5 text-base sm:text-sm placeholder:text-muted-foreground/60 ${props.className ?? ''}`}
     />
   )
 }
@@ -275,7 +275,7 @@ export function LoanOrigination() {
 
   if (done) {
     return (
-      <div className="max-w-md mx-auto pt-16 text-center space-y-5">
+      <div className="max-w-lg mx-auto pt-12 text-center space-y-6">
         <div className="flex justify-center">
           <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
             <CheckCircle2 className="h-8 w-8 text-primary" />
@@ -306,10 +306,10 @@ export function LoanOrigination() {
           </div>
         )}
         <div className="flex gap-3">
-          <button onClick={() => navigate('/lender')} className="flex-1 rounded-lg bg-primary py-2.5 text-sm font-semibold text-white hover:bg-primary/90">
+          <button onClick={() => navigate('/lender')} className="button-primary flex-1">
             Go to Portfolio
           </button>
-          <button onClick={() => { setDone(false); setStep(1); setForm({ ...INITIAL, currency: platformCurrency || 'PHP' }); setReceipt(null); setReceiptPreview(null); setAccessToken(null); setWaiveDocs(true) }} className="flex-1 rounded-lg border py-2.5 text-sm font-medium hover:bg-muted">
+          <button onClick={() => { setDone(false); setStep(1); setForm({ ...INITIAL, currency: platformCurrency || 'PHP' }); setReceipt(null); setReceiptPreview(null); setAccessToken(null); setWaiveDocs(true) }} className="button-secondary flex-1">
             New Loan
           </button>
         </div>
@@ -318,9 +318,14 @@ export function LoanOrigination() {
   }
 
   return (
-    <div className="max-w-xl mx-auto space-y-6">
+    <div className="max-w-2xl mx-auto space-y-7">
+      <div>
+        <p className="section-label">New loan</p>
+        <h1 className="page-heading mt-1.5">Record a private loan</h1>
+        <p className="mt-1.5 text-sm text-muted-foreground">Set the borrower, terms, and payment tracking details.</p>
+      </div>
       {/* Step indicator */}
-      <div className="flex items-center gap-0">
+      <div className="flex items-center gap-0 rounded-2xl border border-border/80 bg-card p-4 shadow-card">
         {STEPS.map((label, i) => {
           const n = (i + 1) as Step
           const active = n === step
@@ -345,7 +350,7 @@ export function LoanOrigination() {
 
       {/* ── Step 1: Borrower ─────────────────────────────────── */}
       {step === 1 && (
-        <div className="card-base p-4 sm:p-6 space-y-4">
+        <div className="card-base p-5 sm:p-7 space-y-5">
           <div>
             <h2 className="font-semibold">Who's borrowing?</h2>
             <p className="text-xs text-muted-foreground mt-0.5">Contact info is optional — this is for your records only.</p>
@@ -382,7 +387,7 @@ export function LoanOrigination() {
 
       {/* ── Step 2: Terms ────────────────────────────────────── */}
       {step === 2 && (
-        <div className="card-base p-4 sm:p-6 space-y-5">
+        <div className="card-base p-5 sm:p-7 space-y-5">
           <h2 className="font-semibold">Loan terms</h2>
 
           <div>
@@ -423,7 +428,7 @@ export function LoanOrigination() {
                 min={100}
                 step={100}
                 placeholder="10,000"
-                className="w-full rounded-lg border bg-white pl-7 pr-3 py-2.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                className="w-full rounded-xl border bg-card pl-7 pr-3 py-2.5 text-sm"
               />
             </div>
           </div>
@@ -431,7 +436,7 @@ export function LoanOrigination() {
           <div>
             <Label>Currency</Label>
             <select value={form.currency} onChange={e => set('currency', e.target.value)}
-              className="w-full rounded-lg border bg-background px-3 py-2.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+              className="w-full rounded-xl border bg-card px-3 py-2.5 text-sm">
               {CURRENCIES.map(c => <option key={c.code} value={c.code}>{c.label}</option>)}
             </select>
           </div>
@@ -445,7 +450,7 @@ export function LoanOrigination() {
                 set('payment_type', v)
                 if (v === 'daily_interest') set('rate_period', 'daily')
               }}
-              className="w-full rounded-lg border bg-background px-3 py-2.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              className="w-full rounded-xl border bg-card px-3 py-2.5 text-sm"
             >
               {PAYMENT_TYPES.map(opt => (
                 <option key={opt.v} value={opt.v}>{opt.label} — {opt.desc}</option>
@@ -462,7 +467,7 @@ export function LoanOrigination() {
                 onChange={e => set('interest_rate', parseFloat(e.target.value || '0'))}
                 min={0}
                 step={0.5}
-                className="w-full rounded-lg border bg-white pl-3 pr-8 py-2.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                className="w-full rounded-xl border bg-card pl-3 pr-8 py-2.5 text-sm"
               />
               <span className="absolute right-3 top-2.5 text-muted-foreground text-sm">%</span>
             </div>
@@ -576,7 +581,7 @@ export function LoanOrigination() {
             <select
               value={form.purpose}
               onChange={e => set('purpose', e.target.value)}
-              className="w-full rounded-lg border bg-white px-3 py-2.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              className="w-full rounded-xl border bg-card px-3 py-2.5 text-sm"
             >
               {PURPOSES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
             </select>
@@ -589,7 +594,7 @@ export function LoanOrigination() {
               onChange={e => set('notes', e.target.value)}
               rows={2}
               placeholder="Any context about this loan…"
-              className="w-full rounded-lg border bg-white px-3 py-2.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary resize-none"
+              className="w-full rounded-xl border bg-card px-3 py-2.5 text-sm resize-none"
             />
           </div>
         </div>
@@ -598,7 +603,7 @@ export function LoanOrigination() {
       {/* ── Step 3: Review ───────────────────────────────────── */}
       {step === 3 && (
         <div className="space-y-4">
-          <div className="card-base p-4 sm:p-6 space-y-4">
+          <div className="card-base p-5 sm:p-7 space-y-4">
             <h2 className="font-semibold">Review</h2>
 
             <div className="space-y-2.5">
@@ -667,7 +672,7 @@ export function LoanOrigination() {
       {/* ── Step 4: Finalise ─────────────────────────────────── */}
       {step === 4 && (
         <div className="space-y-4">
-          <div className="card-base p-4 sm:p-6 space-y-4">
+          <div className="card-base p-5 sm:p-7 space-y-4">
             <h2 className="font-semibold">Transfer receipt, if you have one</h2>
             <p className="text-sm text-muted-foreground">
               Optional. Attach a screenshot if you want it on the loan. You can save the loan without it.
@@ -719,7 +724,7 @@ export function LoanOrigination() {
           <button
             onClick={() => create.mutate()}
             disabled={create.isPending}
-            className="w-full rounded-lg bg-primary py-3 text-sm font-semibold text-white hover:bg-primary/90 disabled:opacity-50 shadow-sm transition-colors"
+            className="button-primary w-full"
           >
             {create.isPending ? 'Saving…' : 'Save loan and get share link'}
           </button>
@@ -731,7 +736,7 @@ export function LoanOrigination() {
         {step > 1 ? (
           <button
             onClick={() => setStep(s => (s - 1) as Step)}
-            className="flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium hover:bg-muted transition-colors"
+            className="button-secondary gap-2"
           >
             <ArrowLeft className="h-4 w-4" /> Back
           </button>
@@ -741,7 +746,7 @@ export function LoanOrigination() {
           <button
             onClick={() => setStep(s => (s + 1) as Step)}
             disabled={step === 1 ? !step1Valid : step === 2 ? !step2Valid : false}
-            className="flex items-center gap-2 rounded-lg bg-primary px-5 py-2 text-sm font-semibold text-white hover:bg-primary/90 disabled:opacity-50 transition-colors"
+            className="button-primary gap-2 px-5"
           >
             {step === 3 ? 'Funds Sent →' : 'Continue'} {step !== 3 && <ArrowRight className="h-4 w-4" />}
           </button>

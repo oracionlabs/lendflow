@@ -35,25 +35,25 @@ export function AdminShell() {
   }
 
   const navLinkClass = ({ isActive }: { isActive: boolean }) => cn(
-    'flex items-center gap-2.5 rounded-lg px-3 min-h-11 text-sm font-medium transition-all',
+    'flex items-center gap-3 rounded-xl px-3.5 min-h-11 text-sm font-medium transition-all',
     isActive
       ? 'bg-primary text-white shadow-sm'
-      : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+      : 'text-white/60 hover:bg-white/10 hover:text-white'
   )
 
   const sidebarBody = (
     <>
-      <div className="px-5 py-5 border-b border-border">
+      <div className="px-6 py-6">
         <div className="flex items-center gap-2">
-          <div className="h-7 w-7 rounded-lg bg-primary flex items-center justify-center">
-            <span className="text-xs font-bold text-white">L</span>
+          <div className="h-8 w-8 rounded-xl bg-lime flex items-center justify-center shadow-sm">
+            <span className="text-xs font-bold text-lime-foreground">L</span>
           </div>
-          <span className="font-bold text-base tracking-tight">LendFlow</span>
+          <span className="font-bold text-base tracking-tight text-white">LendFlow</span>
         </div>
-        <p className="text-[11px] text-muted-foreground mt-1 ml-9">Admin Portal</p>
+        <p className="text-[11px] text-white/45 mt-1 ml-10 tracking-wide">Admin Portal</p>
       </div>
 
-      <nav className="flex-1 px-3 py-3 space-y-0.5 overflow-y-auto">
+      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
         {navItems.map(({ to, label, icon: Icon, end }) => (
           <NavLink key={to} to={to} end={end} className={navLinkClass}>
             <Icon className="h-4 w-4 flex-shrink-0" />
@@ -62,19 +62,19 @@ export function AdminShell() {
         ))}
       </nav>
 
-      <div className="px-3 py-3 border-t border-border pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+      <div className="px-3 py-4 border-t border-white/10 pb-[max(1rem,env(safe-area-inset-bottom))]">
         <div className="flex items-center gap-2.5 px-3 py-2 rounded-lg mb-0.5">
-          <div className="h-7 w-7 rounded-full bg-primary/15 flex items-center justify-center flex-shrink-0">
-            <span className="text-xs font-bold text-primary">{initial}</span>
+          <div className="h-7 w-7 rounded-full bg-white/10 flex items-center justify-center flex-shrink-0">
+            <span className="text-xs font-bold text-white">{initial}</span>
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium truncate leading-tight">{user?.name}</p>
-            <p className="text-[11px] text-muted-foreground truncate">Admin</p>
+            <p className="text-sm font-medium truncate leading-tight text-white">{user?.name}</p>
+            <p className="text-[11px] text-white/40 truncate">Admin</p>
           </div>
         </div>
         <button
           onClick={signOutAndLeave}
-          className="flex w-full items-center gap-2.5 rounded-lg px-3 min-h-11 text-sm text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+          className="flex w-full items-center gap-2.5 rounded-xl px-3 min-h-11 text-sm text-white/60 hover:bg-white/10 hover:text-white transition-colors"
         >
           <LogOut className="h-4 w-4" />
           Sign out
@@ -85,7 +85,7 @@ export function AdminShell() {
 
   return (
     <div className="flex h-dvh bg-background">
-      <aside className="hidden md:flex w-56 flex-shrink-0 flex-col bg-card border-r border-border shadow-sm">
+      <aside className="hidden md:flex w-64 flex-shrink-0 flex-col bg-sidebar">
         {sidebarBody}
       </aside>
 
@@ -97,11 +97,11 @@ export function AdminShell() {
             aria-label="Close menu"
             onClick={() => setNavOpen(false)}
           />
-          <aside className="absolute inset-y-0 left-0 flex w-[min(18rem,88vw)] flex-col bg-card shadow-xl pt-[env(safe-area-inset-top)]">
+          <aside className="absolute inset-y-0 left-0 flex w-[min(18rem,88vw)] flex-col bg-sidebar shadow-xl pt-[env(safe-area-inset-top)]">
             <button
               type="button"
               onClick={() => setNavOpen(false)}
-              className="absolute right-2 top-[max(0.5rem,env(safe-area-inset-top))] flex h-11 w-11 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted"
+              className="absolute right-2 top-[max(0.5rem,env(safe-area-inset-top))] flex h-11 w-11 items-center justify-center rounded-lg text-white/60 hover:bg-white/10 hover:text-white"
               aria-label="Close menu"
             >
               <X className="h-5 w-5" />
@@ -112,7 +112,7 @@ export function AdminShell() {
       )}
 
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="sticky top-0 z-30 bg-card border-b border-border flex items-center justify-between gap-2 px-2 md:px-6 shadow-sm pt-[env(safe-area-inset-top)] min-h-14">
+        <header className="sticky top-0 z-30 bg-background/85 backdrop-blur-xl border-b border-border/70 flex items-center justify-between gap-2 px-2 md:px-8 pt-[env(safe-area-inset-top)] min-h-16">
           <div className="flex items-center gap-1 min-w-0">
             <button
               type="button"
@@ -135,7 +135,7 @@ export function AdminShell() {
             </div>
           </div>
         </header>
-        <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-6 pb-[max(1rem,env(safe-area-inset-bottom))]">
+        <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-8 pb-[max(2.5rem,env(safe-area-inset-bottom))]">
           <Outlet />
         </main>
       </div>

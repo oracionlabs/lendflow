@@ -22,7 +22,7 @@ export function LenderLoans() {
   })
 
   if (isLoading) return (
-    <div className="max-w-lg mx-auto space-y-3">
+    <div className="max-w-5xl mx-auto space-y-3">
       {Array.from({ length: 4 }).map((_, i) => <CardSkeleton key={i} />)}
     </div>
   )
@@ -36,8 +36,11 @@ export function LenderLoans() {
   }
 
   return (
-    <div className="max-w-lg mx-auto space-y-6">
-      <h1 className="text-xl font-bold">My Loans</h1>
+    <div className="max-w-5xl mx-auto space-y-7">
+      <div>
+        <h1 className="page-heading">My Loans</h1>
+        <p className="mt-1.5 text-sm text-muted-foreground">Track balances, terms, and upcoming payments.</p>
+      </div>
 
       {!commitments?.length ? (
         <div className="text-center py-16 space-y-3">
@@ -59,16 +62,16 @@ export function LenderLoans() {
         <>
           {active.length > 0 && (
             <section>
-              <h2 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-2">Active</h2>
-              <div className="space-y-2">
+              <h2 className="section-label mb-3">Active</h2>
+              <div className="grid gap-3 lg:grid-cols-2">
                 {active.map(c => <LoanRow key={c.id} c={c} />)}
               </div>
             </section>
           )}
           {other.length > 0 && (
             <section>
-              <h2 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-2">Other</h2>
-              <div className="space-y-2">
+              <h2 className="section-label mb-3">Other</h2>
+              <div className="grid gap-3 lg:grid-cols-2">
                 {other.map(c => <LoanRow key={c.id} c={c} />)}
               </div>
             </section>

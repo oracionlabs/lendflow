@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
 import api from '@/lib/api'
 import { toast } from 'sonner'
+import { BriefcaseBusiness, ChartNoAxesCombined, LockKeyhole, UserRound, Zap } from 'lucide-react'
 
 type Role = 'borrower' | 'lender'
 
@@ -37,24 +38,28 @@ export function RegisterPage() {
   return (
     <div className="min-h-dvh flex bg-background">
       {/* Left panel */}
-      <div className="hidden lg:flex lg:w-1/2 bg-primary flex-col justify-between p-12">
+      <div className="hidden lg:flex lg:w-[46%] bg-sidebar flex-col justify-between p-12 xl:p-16 relative overflow-hidden">
+        <div className="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full bg-primary/25 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-24 -left-16 h-72 w-72 rounded-full bg-lime/10 blur-3xl" />
         <div className="flex items-center gap-2">
-          <div className="h-8 w-8 rounded-lg bg-white/20 flex items-center justify-center">
-            <span className="text-sm font-bold text-white">L</span>
+          <div className="h-9 w-9 rounded-xl bg-lime flex items-center justify-center shadow-sm">
+            <span className="text-sm font-bold text-lime-foreground">L</span>
           </div>
-          <span className="text-white font-bold text-lg">LendFlow</span>
+          <span className="text-white font-bold text-lg tracking-tight">LendFlow</span>
         </div>
-        <div className="space-y-6">
+        <div className="space-y-7 relative">
           {[
-            { icon: '🔒', title: 'Private & Vetted', desc: 'Every borrower and lender is manually reviewed before accessing the network.' },
-            { icon: '📊', title: 'Full Transparency', desc: 'AI credit assessments, amortization schedules, and yield tracking — all visible.' },
-            { icon: '⚡', title: 'Fast Origination', desc: 'Lenders can originate and fund deals directly, closing in days not months.' },
-          ].map(item => (
-            <div key={item.title} className="flex gap-4">
-              <div className="text-2xl">{item.icon}</div>
+            { icon: LockKeyhole, title: 'Private & Vetted', desc: 'Every borrower and lender is manually reviewed before accessing the network.' },
+            { icon: ChartNoAxesCombined, title: 'Full Transparency', desc: 'Credit assessments, repayment schedules, and yield tracking stay visible.' },
+            { icon: Zap, title: 'Flexible Origination', desc: 'Arrange cash or product loans and track payments from one clear workspace.' },
+          ].map(({ icon: Icon, title, desc }) => (
+            <div key={title} className="flex gap-4">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/10 text-lime">
+                <Icon className="h-5 w-5" />
+              </div>
               <div>
-                <p className="text-white font-semibold text-sm">{item.title}</p>
-                <p className="text-white/60 text-xs mt-0.5 leading-relaxed">{item.desc}</p>
+                <p className="text-white font-semibold text-sm">{title}</p>
+                <p className="text-white/55 text-xs mt-1 leading-relaxed max-w-sm">{desc}</p>
               </div>
             </div>
           ))}
@@ -64,7 +69,7 @@ export function RegisterPage() {
 
       {/* Right panel */}
       <div className="flex-1 overflow-y-auto">
-        <div className="mx-auto flex min-h-dvh w-full max-w-sm flex-col justify-center px-5 py-8 pt-[max(2rem,env(safe-area-inset-top))] pb-[max(2rem,env(safe-area-inset-bottom))]">
+        <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center px-6 py-10 pt-[max(2rem,env(safe-area-inset-top))] pb-[max(2rem,env(safe-area-inset-bottom))]">
           <div className="mb-8">
             <div className="flex items-center gap-2 mb-6 lg:hidden">
               <div className="h-7 w-7 rounded-lg bg-primary flex items-center justify-center">
@@ -75,15 +80,15 @@ export function RegisterPage() {
 
             {step === 1 ? (
               <>
-                <h1 className="text-2xl sm:text-3xl font-bold">Create your account</h1>
-                <p className="text-muted-foreground text-sm mt-1">Choose how you'll use LendFlow</p>
+                <h1 className="page-heading">Create your account</h1>
+                <p className="text-muted-foreground text-sm mt-2">Choose how you'll use LendFlow.</p>
               </>
             ) : (
               <>
                 <button onClick={() => setStep(1)} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-4 transition-colors">
                   ← Back
                 </button>
-                <h1 className="text-2xl font-bold">Your details</h1>
+                <h1 className="page-heading">Your details</h1>
                 <p className="text-muted-foreground text-sm mt-1">
                   Signing up as a <span className="font-medium text-foreground capitalize">{role === 'lender' ? 'Capital Partner' : role}</span>
                 </p>
@@ -94,15 +99,17 @@ export function RegisterPage() {
           {step === 1 && (
             <div className="space-y-3">
               {([
-                { role: 'borrower' as Role, label: 'Borrower', desc: 'Apply for loans, track repayments, manage your application history', icon: '📋' },
-                { role: 'lender' as Role, label: 'Capital Partner', desc: 'Fund vetted loan opportunities, earn yield, originate deals directly', icon: '💼' },
+                { role: 'borrower' as Role, label: 'Borrower', desc: 'Apply for loans, track repayments, manage your application history', icon: UserRound },
+                { role: 'lender' as Role, label: 'Capital Partner', desc: 'Fund vetted loan opportunities, earn yield, originate deals directly', icon: BriefcaseBusiness },
               ]).map(opt => (
                 <button
                   key={opt.role}
                   onClick={() => { setRole(opt.role); setStep(2) }}
-                  className="w-full flex items-start gap-4 rounded-xl border-2 border-border bg-card p-4 sm:p-5 min-h-11 hover:border-primary hover:shadow-card-md transition-all text-left group"
+                  className="w-full flex items-start gap-4 rounded-2xl border border-border bg-card p-5 min-h-11 interactive-card text-left group"
                 >
-                  <span className="text-2xl">{opt.icon}</span>
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                    <opt.icon className="h-5 w-5" />
+                  </span>
                   <div>
                     <p className="font-semibold text-sm group-hover:text-primary transition-colors">{opt.label}</p>
                     <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{opt.desc}</p>
@@ -134,7 +141,7 @@ export function RegisterPage() {
                     required
                     autoFocus
                     autoComplete="name"
-                    className="w-full rounded-lg border bg-card px-3 py-3 text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    className="w-full rounded-xl border bg-card px-3.5 py-3 text-base"
                     placeholder="Jane Smith"
                   />
                 </div>
@@ -147,7 +154,7 @@ export function RegisterPage() {
                     required
                     autoComplete="email"
                     inputMode="email"
-                    className="w-full rounded-lg border bg-card px-3 py-3 text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    className="w-full rounded-xl border bg-card px-3.5 py-3 text-base"
                     placeholder="you@example.com"
                   />
                 </div>
@@ -160,14 +167,14 @@ export function RegisterPage() {
                     required
                     minLength={8}
                     autoComplete="new-password"
-                    className="w-full rounded-lg border bg-card px-3 py-3 text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    className="w-full rounded-xl border bg-card px-3.5 py-3 text-base"
                     placeholder="Min. 8 characters"
                   />
                 </div>
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full min-h-11 rounded-lg bg-primary py-3 text-base font-semibold text-white hover:bg-primary/90 disabled:opacity-50 transition-colors shadow-sm"
+                  className="button-primary w-full py-3 text-base"
                 >
                   {loading ? 'Creating account…' : 'Create account'}
                 </button>

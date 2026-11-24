@@ -15,7 +15,7 @@ const PAST_STATUSES = ['completed', 'rejected', 'cancelled', 'defaulted']
 function LoanCard({ loan }: { loan: Loan }) {
   return (
     <Link to={`/borrower/loans/${loan.id}`}
-      className="flex items-center justify-between card-base p-4 active:scale-[0.99] transition-transform">
+      className="flex items-center justify-between card-base interactive-card p-4">
       <div className="min-w-0">
         <p className="font-medium text-sm">{LOAN_PURPOSE_LABELS[loan.purpose] ?? loan.purpose}</p>
         <p className="text-xs text-muted-foreground mt-0.5">
@@ -36,7 +36,7 @@ function Section({ title, loans }: { title: string; loans: Loan[] }) {
   return (
     <section>
       <h2 className="font-semibold text-sm mb-2 text-muted-foreground uppercase tracking-wide text-[11px]">{title}</h2>
-      <div className="space-y-2">
+      <div className="grid gap-3 sm:grid-cols-2">
         {loans.map(l => <LoanCard key={l.id} loan={l} />)}
       </div>
     </section>
@@ -54,7 +54,7 @@ export function BorrowerLoans() {
   })
 
   if (isLoading) return (
-    <div className="max-w-lg mx-auto space-y-3">
+    <div className="max-w-4xl mx-auto space-y-3">
       {Array.from({ length: 4 }).map((_, i) => <CardSkeleton key={i} />)}
     </div>
   )
@@ -64,8 +64,11 @@ export function BorrowerLoans() {
   const past = loans?.filter(l => PAST_STATUSES.includes(l.status)) ?? []
 
   return (
-    <div className="max-w-lg mx-auto space-y-6">
-      <h1 className="text-xl font-bold">My Loans</h1>
+    <div className="max-w-4xl mx-auto space-y-7">
+      <div>
+        <h1 className="page-heading">My Loans</h1>
+        <p className="mt-1.5 text-sm text-muted-foreground">See applications, active balances, and completed loans.</p>
+      </div>
 
       {!loans?.length ? (
         <div className="text-center py-16 space-y-3">

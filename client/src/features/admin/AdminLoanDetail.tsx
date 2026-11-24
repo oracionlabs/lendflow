@@ -146,14 +146,14 @@ export function AdminLoanDetail() {
   const amount = loan.approved_amount ?? loan.amount_requested
 
   return (
-    <div className="max-w-3xl space-y-6">
+    <div className="mx-auto max-w-4xl space-y-7">
       <Link to="/admin/loans" className="inline-flex min-h-11 items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground">
         <ArrowLeft className="h-4 w-4" /> Loan Management
       </Link>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 space-y-1">
-          <h1 className="text-2xl font-bold break-words">{LOAN_PURPOSE_LABELS[loan.purpose] ?? loan.purpose}</h1>
+          <h1 className="page-heading break-words">{LOAN_PURPOSE_LABELS[loan.purpose] ?? loan.purpose}</h1>
           <p className="text-sm text-muted-foreground break-all">{borrower?.name ?? 'Borrower'}{borrower?.email ? ` · ${borrower.email}` : ''}</p>
           <div className="flex flex-wrap items-center gap-2 pt-1">
             <StatusBadge status={loan.status} />
@@ -161,7 +161,7 @@ export function AdminLoanDetail() {
           </div>
         </div>
         <div className="sm:text-right">
-          <p className="text-2xl font-bold break-words">{fmt(amount)}</p>
+          <p className="text-2xl sm:text-3xl font-bold break-words tabular-nums">{fmt(amount)}</p>
           <p className="text-sm text-muted-foreground">{loan.term_months} month term</p>
         </div>
       </div>
@@ -175,7 +175,7 @@ export function AdminLoanDetail() {
           ['Lenders', String(loan.lender_count ?? 0)],
           ['Opened', formatDate(loan.created_at)],
         ].map(([label, value]) => (
-          <div key={label} className="card-base p-3">
+          <div key={label} className="card-base p-4">
             <p className="text-xs text-muted-foreground">{label}</p>
             <p className="font-medium mt-0.5 break-words">{value}</p>
           </div>

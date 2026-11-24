@@ -124,10 +124,10 @@ export function ActiveLoanDetail() {
   const fmt = (cents: number): string => formatCents(cents, loan.currency)
 
   return (
-    <div className="max-w-4xl space-y-8">
+    <div className="max-w-4xl mx-auto space-y-8">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          <h1 className="text-2xl font-bold break-words">{loan.loan_kind === 'product' && loan.product_name ? loan.product_name : (LOAN_PURPOSE_LABELS[loan.purpose] ?? loan.purpose)}</h1>
+          <h1 className="page-heading break-words">{loan.loan_kind === 'product' && loan.product_name ? loan.product_name : (LOAN_PURPOSE_LABELS[loan.purpose] ?? loan.purpose)}</h1>
           {loan.loan_kind === 'product' && <p className="text-sm text-muted-foreground">Product loan</p>}
           <div className="flex items-center gap-3 mt-1 flex-wrap">
             <StatusBadge status={loan.status} />

@@ -68,24 +68,24 @@ export function PortfolioDashboard() {
   const pendingRequests = requests?.filter(r => ['submitted', 'under_review'].includes(r.status)) ?? []
 
   if (isLoading) return (
-    <div className="space-y-4 max-w-lg mx-auto">
+    <div className="space-y-4 max-w-5xl mx-auto">
       {Array.from({ length: 3 }).map((_, i) => <CardSkeleton key={i} />)}
     </div>
   )
 
   return (
-    <div className="max-w-lg mx-auto space-y-5">
+    <div className="max-w-5xl mx-auto space-y-7">
       {/* Greeting */}
       <div>
-        <h1 className="text-xl font-bold">Hi, {user?.name?.split(' ')[0]} 👋</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
+        <h1 className="page-heading">Hi, {user?.name?.split(' ')[0]} 👋</h1>
+        <p className="text-sm text-muted-foreground mt-1.5">
           {listing ? `Your listing is ${listing.status}` : 'Set up your listing to start receiving requests'}
         </p>
       </div>
 
       {/* My Listing status card */}
       {listing ? (
-        <Link to="/lender/listing" className="block card-base p-5 active:scale-[0.99] transition-transform">
+        <Link to="/lender/listing" className="block card-base interactive-card p-5 md:p-6">
           <div className="flex items-start justify-between">
             <div>
               <div className="flex items-center gap-2 mb-1">
@@ -141,7 +141,7 @@ export function PortfolioDashboard() {
       {(summary?.active_loans ?? 0) > 0 && (
         <section>
           <h2 className="font-semibold text-sm mb-2">Portfolio</h2>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             {[
               { label: 'Active Loans', value: String(summary?.active_loans ?? 0), sub: 'commitments' },
               { label: 'Committed', value: formatCents(summary?.total_committed ?? 0), sub: 'deployed' },
@@ -166,9 +166,9 @@ export function PortfolioDashboard() {
         <section>
           <div className="flex items-center justify-between mb-2">
             <h2 className="font-semibold text-sm">Active Loans</h2>
-            <Link to="/lender/loans" className="text-xs text-primary">View all</Link>
+            <Link to="/lender/loans" className="text-xs font-semibold text-primary hover:underline">View all</Link>
           </div>
-          <div className="space-y-2">
+          <div className="grid gap-3 lg:grid-cols-2">
             {(commitments ?? [])
               .filter(c => ['active', 'repaying'].includes(c.status) || ['active', 'repaying', 'funding', 'fully_funded'].includes(c.loans?.status))
               .slice(0, 5)

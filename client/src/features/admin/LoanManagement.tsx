@@ -46,13 +46,16 @@ export function LoanManagement() {
   const statuses = ['submitted', 'under_review', 'approved', 'funding', 'fully_funded', 'active', 'repaying', 'completed', 'defaulted', 'rejected', 'cancelled']
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Loan Management</h1>
+    <div className="mx-auto max-w-7xl space-y-7">
+      <div>
+        <h1 className="page-heading">Loan Management</h1>
+        <p className="mt-1.5 text-sm text-muted-foreground">Review every loan, status, and disbursement in one place.</p>
+      </div>
 
-      <div className="flex gap-2 flex-wrap">
+      <div className="flex gap-2 flex-wrap rounded-2xl bg-card p-2 border border-border/80 shadow-card">
         <button
           onClick={() => setStatusFilter('')}
-          className={`rounded-full px-3 min-h-11 text-xs font-medium transition-colors ${!statusFilter ? 'bg-primary text-primary-foreground' : 'border hover:bg-accent'}`}
+          className={`rounded-full px-3 min-h-11 text-xs font-medium transition-colors ${!statusFilter ? 'bg-primary text-primary-foreground' : 'hover:bg-accent'}`}
         >
           All
         </button>
@@ -60,7 +63,7 @@ export function LoanManagement() {
           <button
             key={s}
             onClick={() => setStatusFilter(statusFilter === s ? '' : s)}
-            className={`rounded-full px-3 min-h-11 text-xs font-medium transition-colors capitalize ${statusFilter === s ? 'bg-primary text-primary-foreground' : 'border hover:bg-accent'}`}
+            className={`rounded-full px-3 min-h-11 text-xs font-medium transition-colors capitalize ${statusFilter === s ? 'bg-primary text-primary-foreground' : 'hover:bg-accent'}`}
           >
             {s.replace('_', ' ')}
           </button>
@@ -120,7 +123,7 @@ export function LoanManagement() {
           </div>
           <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-muted/30 border-b border-border">
+            <thead className="bg-muted/50 border-b border-border">
               <tr>
                 <th className="text-left p-3 font-medium">Borrower</th>
                 <th className="text-left p-3 font-medium">Purpose</th>
@@ -136,7 +139,7 @@ export function LoanManagement() {
                 <tr
                   key={loan.id}
                   onClick={() => navigate(`/admin/loans/${loan.id}`)}
-                  className="border-b last:border-0 hover:bg-muted/30 cursor-pointer"
+                  className="border-b last:border-0 hover:bg-primary/[0.035] cursor-pointer transition-colors"
                 >
                   <td className="p-3">
                     <p className="font-medium">{loan.users?.name ?? '—'}</p>
