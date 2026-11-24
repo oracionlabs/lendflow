@@ -164,7 +164,7 @@ export function PlatformSettings() {
             <h2 className="font-semibold">Currency</h2>
             <div className="flex flex-col gap-0.5 sm:flex-row sm:gap-4 py-2">
               <span className="sm:w-48 text-muted-foreground">Platform Currency</span>
-              <span className="font-medium">{(settings as Record<string, unknown> | undefined)?.currency as string ?? 'USD'}</span>
+              <span className="font-medium">{CURRENCIES.find(c => c.code === ((settings as Record<string, unknown> | undefined)?.currency as string ?? 'USD'))?.label ?? 'USD — US Dollar ($)'}</span>
             </div>
           </section>
           <section className="space-y-3">

@@ -16,6 +16,7 @@ export const LOAN_STATUS_LABELS: Record<LoanStatus, string> = {
 }
 
 export const CURRENCIES: { code: string; label: string }[] = [
+  { code: 'PHP', label: 'PHP — Philippine Peso (₱)' },
   { code: 'USD', label: 'USD — US Dollar ($)' },
   { code: 'EUR', label: 'EUR — Euro (€)' },
   { code: 'GBP', label: 'GBP — British Pound (£)' },
@@ -31,7 +32,6 @@ export const CURRENCIES: { code: string; label: string }[] = [
   { code: 'MXN', label: 'MXN — Mexican Peso (MX$)' },
   { code: 'SGD', label: 'SGD — Singapore Dollar (S$)' },
   { code: 'AED', label: 'AED — UAE Dirham (د.إ)' },
-  { code: 'PHP', label: 'PHP — Philippine Peso (₱)' },
 ]
 
 export const LOAN_PURPOSE_LABELS: Record<string, string> = {
