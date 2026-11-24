@@ -28,6 +28,7 @@ import { LenderReports } from '@/features/lender/LenderReports'
 import { AdminDashboard } from '@/features/admin/AdminDashboard'
 import { ApplicationQueue } from '@/features/admin/ApplicationQueue'
 import { LoanManagement } from '@/features/admin/LoanManagement'
+import { AdminLoanDetail } from '@/features/admin/AdminLoanDetail'
 import { UserManagement } from '@/features/admin/UserManagement'
 import { PlatformSettings } from '@/features/admin/PlatformSettings'
 import { RiskMonitor } from '@/features/admin/RiskMonitor'
@@ -81,6 +82,7 @@ export const router = createBrowserRouter([
         { path: '/admin', element: <AdminDashboard /> },
         { path: '/admin/queue', element: <ApplicationQueue /> },
         { path: '/admin/loans', element: <LoanManagement /> },
+        { path: '/admin/loans/:id', element: <AdminLoanDetail /> },
         { path: '/admin/users', element: <UserManagement /> },
         { path: '/admin/settings', element: <PlatformSettings /> },
         { path: '/admin/risk', element: <RiskMonitor /> },

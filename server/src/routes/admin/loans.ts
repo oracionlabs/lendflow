@@ -67,12 +67,31 @@ router.get('/:id', async (req: Request, res: Response): Promise<void> => {
 
   const { data: history } = await db
     .from('loans')
-    .select('id, status, amount_requested, created_at')
+    .select('id, status, amount_requested, purpose, created_at')
     .eq('borrower_id', loan.borrower_id)
     .neq('id', req.params.id)
     .order('created_at', { ascending: false })
 
-  res.json({ loan, profile, documents: docs ?? [], history: history ?? [] })
+  const { data: borrower } = await db
+    .from('users')
+    .select('id, name, email')
+    .eq('id', loan.borrower_id)
+    .single()
+
+  const { data: commitments } = await db
+    .from('funding_commitments')
+    .select('id, amount, share_percent, status, funded_at, users!lender_id(name, email)')
+    .eq('loan_id', req.params.id)
+    .order('funded_at', { ascending: false })
+
+  res.json({
+    loan,
+    borrower: borrower ?? null,
+    profile,
+    documents: docs ?? [],
+    history: history ?? [],
+    commitments: commitments ?? [],
+  })
 })
 
 router.post('/:id/review', async (req: Request, res: Response): Promise<void> => {

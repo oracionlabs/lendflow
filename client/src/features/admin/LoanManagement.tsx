@@ -1,5 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { ChevronRight } from 'lucide-react'
 import api from '@/lib/api'
 import { formatCents, formatDate, useCurrency } from '@/lib/utils'
 import { StatusBadge } from '@/components/shared/StatusBadge'
@@ -13,6 +15,7 @@ type LoanWithUser = Loan & { users?: { name: string; email: string } }
 
 export function LoanManagement() {
   useCurrency() // subscribe to currency changes
+  const navigate = useNavigate()
   const qc = useQueryClient()
   const [statusFilter, setStatusFilter] = useState('')
   const [disburseId, setDisburseId] = useState<string | null>(null)
@@ -68,13 +71,23 @@ export function LoanManagement() {
         <div className="card-base overflow-hidden">
           <div className="md:hidden divide-y divide-border">
             {data?.loans.map(loan => (
-              <div key={loan.id} className="p-4 space-y-3">
+              <div
+                key={loan.id}
+                role="link"
+                tabIndex={0}
+                onClick={() => navigate(`/admin/loans/${loan.id}`)}
+                onKeyDown={e => { if (e.key === 'Enter') navigate(`/admin/loans/${loan.id}`) }}
+                className="p-4 space-y-3 cursor-pointer active:bg-muted/40"
+              >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="font-medium truncate">{loan.users?.name ?? '—'}</p>
                     <p className="text-xs text-muted-foreground break-all">{loan.users?.email}</p>
                   </div>
-                  <StatusBadge status={loan.status} />
+                  <div className="flex items-center gap-1 shrink-0">
+                    <StatusBadge status={loan.status} />
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  </div>
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-sm">
                   <div>
@@ -96,7 +109,7 @@ export function LoanManagement() {
                 </div>
                 {loan.status === 'fully_funded' && (
                   <button
-                    onClick={() => setDisburseId(loan.id)}
+                    onClick={e => { e.stopPropagation(); setDisburseId(loan.id) }}
                     className="w-full min-h-11 rounded-lg bg-emerald-600 text-sm font-semibold text-white hover:bg-emerald-700"
                   >
                     Disburse
@@ -120,7 +133,11 @@ export function LoanManagement() {
             </thead>
             <tbody>
               {data?.loans.map(loan => (
-                <tr key={loan.id} className="border-b last:border-0 hover:bg-muted/30">
+                <tr
+                  key={loan.id}
+                  onClick={() => navigate(`/admin/loans/${loan.id}`)}
+                  className="border-b last:border-0 hover:bg-muted/30 cursor-pointer"
+                >
                   <td className="p-3">
                     <p className="font-medium">{loan.users?.name ?? '—'}</p>
                     <p className="text-xs text-muted-foreground">{loan.users?.email}</p>
@@ -133,12 +150,13 @@ export function LoanManagement() {
                   <td className="p-3">
                     {loan.status === 'fully_funded' && (
                       <button
-                        onClick={() => setDisburseId(loan.id)}
+                        onClick={e => { e.stopPropagation(); setDisburseId(loan.id) }}
                         className="text-xs rounded-md bg-emerald-600 px-3 py-1 text-white hover:bg-emerald-700"
                       >
                         Disburse
                       </button>
                     )}
+                    <ChevronRight className="inline h-4 w-4 text-muted-foreground" />
                   </td>
                 </tr>
               ))}
