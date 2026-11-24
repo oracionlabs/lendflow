@@ -69,6 +69,7 @@ export function CommitmentDetail() {
   const qc = useQueryClient()
   const [showCancel, setShowCancel] = useState(false)
   const [partialAmount, setPartialAmount] = useState('')
+  const [extendDate, setExtendDate] = useState('')
   const [cancelReason, setCancelReason] = useState(CANCEL_REASONS[0])
   const [cancelOther, setCancelOther] = useState('')
 
@@ -112,6 +113,21 @@ export function CommitmentDetail() {
     },
     onError: (err: unknown) => {
       const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Could not record the payment'
+      toast.error(msg)
+    },
+  })
+
+  const extendDue = useMutation({
+    mutationFn: () => api.post(`/api/lender/loans/${loanId}/extend`, { due_date: extendDate }),
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: ['lender-schedule', loanId] })
+      qc.invalidateQueries({ queryKey: ['commitment', id] })
+      qc.invalidateQueries({ queryKey: ['lender-commitments'] })
+      setExtendDate('')
+      toast.success('Due date extended. The amount due includes the extra interest.')
+    },
+    onError: (err: unknown) => {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Could not extend the due date'
       toast.error(msg)
     },
   })
@@ -171,7 +187,7 @@ export function CommitmentDetail() {
   const chartData = Object.values(monthlyYields)
 
   return (
-    <div className="space-y-4 pb-8">
+    <div className="mx-auto max-w-5xl space-y-6 pb-8">
       <Link to="/lender" className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
         <ArrowLeft className="h-4 w-4" /> Portfolio
       </Link>
@@ -183,7 +199,7 @@ export function CommitmentDetail() {
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap mb-1">
-              <h1 className="text-lg font-bold leading-tight">{loan.loan_kind === 'product' && loan.product_name ? loan.product_name : (LOAN_PURPOSE_LABELS[loan.purpose] ?? loan.purpose)}</h1>
+              <h1 className="text-xl sm:text-2xl font-bold leading-tight">{loan.loan_kind === 'product' && loan.product_name ? loan.product_name : (LOAN_PURPOSE_LABELS[loan.purpose] ?? loan.purpose)}</h1>
               <CreditGradeBadge grade={grade} />
             </div>
             <p className="text-xs text-muted-foreground">
@@ -335,6 +351,43 @@ export function CommitmentDetail() {
               Record partial
             </button>
           </div>
+          {(() => {
+            const openRows = schedule.filter(row => row.status !== 'paid' && row.status !== 'waived')
+            const last = openRows[openRows.length - 1]
+            if (!last) return null
+            const extraDays = extendDate
+              ? Math.round((Date.parse(`${extendDate}T00:00:00`) - Date.parse(`${last.due_date}T00:00:00`)) / 86400000)
+              : 0
+            const principal = openRows.reduce((sum, row) => sum + Math.max(0, row.principal_due - row.principal_paid), 0)
+            const extra = extraDays > 0 ? Math.round(principal * (loan.interest_rate ?? 0) * extraDays / 365) : 0
+            const stillOwed = openRows.reduce((sum, row) => sum + Math.max(0, row.total_due - row.total_paid), 0)
+            return (
+              <div className="space-y-2 border-t pt-3">
+                <p className="text-sm font-medium">Extend the full-payment date</p>
+                <p className="text-xs text-muted-foreground">Current full payment is due {formatDate(last.due_date)}. Extra days add interest on the remaining principal.</p>
+                <input
+                  type="date"
+                  value={extendDate}
+                  min={last.due_date}
+                  onChange={e => setExtendDate(e.target.value)}
+                  className="min-h-11 w-full rounded-lg border bg-background px-3 text-sm"
+                />
+                {extraDays > 0 && (
+                  <p className="text-xs">
+                    {extraDays} more days adds {fmt(extra)}. New amount due {fmt(stillOwed + extra)}.
+                  </p>
+                )}
+                <button
+                  type="button"
+                  disabled={extendDue.isPending || extraDays <= 0}
+                  onClick={() => extendDue.mutate()}
+                  className="min-h-11 rounded-lg border px-4 text-sm font-medium hover:bg-muted disabled:opacity-50"
+                >
+                  {extendDue.isPending ? 'Updating…' : 'Extend due date'}
+                </button>
+              </div>
+            )
+          })()}
           {schedule.map(row => {
             const owed = Math.max(0, row.total_due - row.total_paid)
             return (

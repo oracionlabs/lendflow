@@ -1,4 +1,8 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import api from '@/lib/api'
+import { toast } from 'sonner'
 import { formatCents, formatDate, formatPercent } from '@/lib/utils'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { LOAN_PURPOSE_LABELS } from '@lendflow/shared'
@@ -23,6 +27,7 @@ export interface DashboardLoan {
   monthly_payment?: number
   loan_kind?: 'cash' | 'product'
   product_name?: string | null
+  payment_channel?: 'wallet' | 'instapay'
   maturity_date?: string
   users?: { name: string } | { name: string }[] | null
   loan_schedule?: ScheduleRow[]
@@ -55,12 +60,13 @@ export function CommitmentCard({
   const owed = next ? Math.max(0, next.total_due - (next.total_paid ?? 0)) : 0
 
   return (
+    <article className="card-base interactive-card p-4 sm:p-5 space-y-4">
     <Link to={`/lender/commitments/${id}`}
-      className="block card-base p-4 active:scale-[0.99] transition-transform space-y-2">
+      className="block space-y-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="font-medium text-sm truncate">{borrower || title}</p>
-          <p className="text-xs text-muted-foreground truncate">
+          <p className="font-semibold truncate">{borrower || title}</p>
+          <p className="text-xs text-muted-foreground truncate mt-0.5">
             {borrower ? title : 'Borrower'} · {loan.loan_kind === 'product' ? 'Product' : 'Cash'}
           </p>
         </div>
@@ -69,19 +75,78 @@ export function CommitmentCard({
           <ChevronRight className="h-4 w-4 text-muted-foreground" />
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
-        <p><span className="text-muted-foreground">Lent </span><span className="font-medium">{formatCents(amount, currency)}</span></p>
-        <p><span className="text-muted-foreground">Rate </span><span className="font-medium">{formatPercent(loan.interest_rate ?? 0)}</span></p>
-        <p><span className="text-muted-foreground">Term </span><span className="font-medium">{loan.term_months} mo</span></p>
-        <p><span className="text-muted-foreground">Left </span><span className="font-medium">{formatCents(remaining, currency)}</span></p>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[
+          ['Lent', formatCents(amount, currency)],
+          ['Rate', formatPercent(loan.interest_rate ?? 0)],
+          ['Term', `${loan.term_months} mo`],
+          ['Remaining', formatCents(remaining, currency)],
+        ].map(([label, value]) => (
+          <div key={label}>
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>
+            <p className="mt-0.5 text-sm font-semibold tabular-nums">{value}</p>
+          </div>
+        ))}
       </div>
-      <p className="text-xs text-muted-foreground">
+      <p className="rounded-xl bg-muted/60 px-3 py-2 text-xs font-medium text-foreground">
         {next
-          ? `Next ${formatDate(next.due_date)} · ${formatCents(owed, currency)}`
+          ? `Next payment · ${formatDate(next.due_date)} · ${formatCents(owed, currency)}`
           : loan.maturity_date
             ? `Matures ${formatDate(loan.maturity_date)}`
             : 'No payment due'}
       </p>
     </Link>
+    {loan.payment_channel === 'instapay' && loan.id && remaining > 0 && (
+      <PayControls loanId={loan.id} />
+    )}
+    </article>
+  )
+}
+
+function PayControls({ loanId }: { loanId: string }) {
+  const [amount, setAmount] = useState('')
+  const qc = useQueryClient()
+  const pay = useMutation({
+    mutationFn: (body: { mode: 'partial' | 'full'; amount?: number }) =>
+      api.post(`/api/lender/loans/${loanId}/instapay-payment`, body),
+    onSuccess: () => {
+      setAmount('')
+      qc.invalidateQueries({ queryKey: ['lender-commitments'] })
+      toast.success('Payment recorded')
+    },
+    onError: (err: unknown) => {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Could not record the payment'
+      toast.error(msg)
+    },
+  })
+
+  return (
+    <div className="flex flex-col gap-2 sm:flex-row">
+      <input
+        type="number"
+        min="1"
+        inputMode="decimal"
+        value={amount}
+        onChange={e => setAmount(e.target.value)}
+        placeholder="Partial amount"
+        className="min-h-11 flex-1 rounded-xl border bg-background px-3 text-sm"
+      />
+      <button
+        type="button"
+        disabled={pay.isPending || !(Number(amount) > 0)}
+        onClick={() => pay.mutate({ mode: 'partial', amount: Math.round(Number(amount) * 100) })}
+        className="min-h-11 rounded-xl border px-3 text-sm font-semibold hover:bg-muted disabled:opacity-50"
+      >
+        Partial
+      </button>
+      <button
+        type="button"
+        disabled={pay.isPending}
+        onClick={() => pay.mutate({ mode: 'full' })}
+        className="min-h-11 rounded-xl bg-primary px-3 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+      >
+        Paid in full
+      </button>
+    </div>
   )
 }

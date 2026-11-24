@@ -85,7 +85,7 @@ router.get('/commitments', async (req: Request, res: Response): Promise<void> =>
         id, purpose, term_months, interest_rate, ai_credit_grade,
         admin_override_grade, status, first_payment_date, maturity_date,
         amount_requested, approved_amount, monthly_payment, currency,
-        loan_kind, product_name,
+        loan_kind, product_name, payment_channel,
         users!borrower_id (name),
         loan_schedule (installment_number, due_date, total_due, total_paid, status)
       )
@@ -665,6 +665,95 @@ router.post('/loans/:loanId/instapay-payment', async (req: Request, res: Respons
   await db.from('loans').update({ status: done ? 'completed' : 'repaying' }).eq('id', req.params.loanId)
 
   res.json({ success: true, applied: payAmount - left, loan_status: done ? 'completed' : 'repaying' })
+})
+
+router.post('/loans/:loanId/extend', async (req: Request, res: Response): Promise<void> => {
+  const lender = res.locals.user
+  const { due_date } = req.body as { due_date?: string }
+  if (!due_date || !/^\d{4}-\d{2}-\d{2}$/.test(due_date)) {
+    res.status(400).json({ error: 'Choose a new due date' })
+    return
+  }
+
+  const db = supabaseAdmin()
+  const { data: commitment } = await db
+    .from('funding_commitments')
+    .select('id, expected_yield, loans!inner(id, interest_rate, payment_channel, status, total_repayment)')
+    .eq('lender_id', lender.id)
+    .eq('loan_id', req.params.loanId)
+    .limit(1)
+    .maybeSingle()
+
+  if (!commitment) { res.status(404).json({ error: 'Loan not found' }); return }
+  const loanJoin = commitment.loans as {
+    id: string
+    interest_rate: number
+    payment_channel?: string
+    status: string
+    total_repayment: number
+  } | Array<{
+    id: string
+    interest_rate: number
+    payment_channel?: string
+    status: string
+    total_repayment: number
+  }>
+  const loan = Array.isArray(loanJoin) ? loanJoin[0] : loanJoin
+  if (!loan || loan.payment_channel !== 'instapay') {
+    res.status(400).json({ error: 'Only tracked loans can have their due date extended here' })
+    return
+  }
+  if (['completed', 'cancelled', 'rejected'].includes(loan.status)) {
+    res.status(400).json({ error: 'This loan is already closed' })
+    return
+  }
+
+  const { data: schedule, error: scheduleError } = await db
+    .from('loan_schedule')
+    .select('*')
+    .eq('loan_id', req.params.loanId)
+    .order('installment_number', { ascending: true })
+  if (scheduleError) { res.status(500).json({ error: scheduleError.message }); return }
+
+  const open = (schedule ?? []).filter(row => !['paid', 'waived'].includes(row.status))
+  if (!open.length) { res.status(400).json({ error: 'This loan is already paid' }); return }
+
+  const last = open[open.length - 1]
+  const extraDays = Math.round((Date.parse(`${due_date}T00:00:00`) - Date.parse(`${last.due_date}T00:00:00`)) / 86400000)
+  if (extraDays <= 0) {
+    res.status(400).json({ error: 'The new due date has to be after the current full-payment date' })
+    return
+  }
+
+  const remainingPrincipal = open.reduce((sum, row) => sum + Math.max(0, row.principal_due - (row.principal_paid ?? 0)), 0)
+  const extraInterest = Math.round(remainingPrincipal * Number(loan.interest_rate) * extraDays / 365)
+
+  for (const row of open) {
+    const shifted = new Date(`${row.due_date}T00:00:00`)
+    shifted.setDate(shifted.getDate() + extraDays)
+    const nextDue = shifted.toISOString().split('T')[0]
+    const isLast = row.id === last.id
+    const { error } = await db.from('loan_schedule').update({
+      due_date: nextDue,
+      interest_due: row.interest_due + (isLast ? extraInterest : 0),
+      total_due: row.total_due + (isLast ? extraInterest : 0),
+    }).eq('id', row.id)
+    if (error) { res.status(500).json({ error: error.message }); return }
+  }
+
+  const newMaturity = new Date(`${last.due_date}T00:00:00`)
+  newMaturity.setDate(newMaturity.getDate() + extraDays)
+  const maturity = newMaturity.toISOString().split('T')[0]
+  await db.from('loans').update({
+    total_repayment: (loan.total_repayment ?? 0) + extraInterest,
+    maturity_date: maturity,
+  }).eq('id', req.params.loanId)
+  await db.from('funding_commitments').update({
+    expected_yield: (commitment.expected_yield ?? 0) + extraInterest,
+  }).eq('id', commitment.id)
+
+  const remaining = open.reduce((sum, row) => sum + Math.max(0, row.total_due - (row.total_paid ?? 0)), 0) + extraInterest
+  res.json({ extra_days: extraDays, extra_interest: extraInterest, new_due_date: maturity, new_amount: remaining })
 })
 
 router.post('/commitments/:id/cancel', async (req: Request, res: Response): Promise<void> => {
