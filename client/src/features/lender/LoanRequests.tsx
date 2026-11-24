@@ -5,7 +5,7 @@ import { formatCents, formatDate, useCurrency } from '@/lib/utils'
 import { toast } from 'sonner'
 import { LOAN_PURPOSE_LABELS } from '@lendflow/shared'
 import { EmptyState } from '@/components/shared/EmptyState'
-import { Users, CheckCircle2, XCircle, ChevronDown, ChevronUp } from 'lucide-react'
+import { Users, ChevronDown, ChevronUp } from 'lucide-react'
 
 interface LoanRequest {
   id: string
@@ -19,10 +19,10 @@ interface LoanRequest {
 }
 
 const STATUS_STYLES: Record<string, string> = {
-  submitted:    'bg-amber-100 text-amber-700',
-  under_review: 'bg-blue-100 text-blue-700',
-  approved:     'bg-emerald-100 text-emerald-700',
-  rejected:     'bg-red-100 text-red-700',
+  submitted: 'text-accent',
+  under_review: 'text-foreground',
+  approved: 'text-foreground',
+  rejected: 'text-muted-foreground',
 }
 
 export function LoanRequests() {
@@ -207,14 +207,11 @@ function RequestCard({ req, expanded, onToggle, onAccept, acceptPending, rejecti
                 </div>
               </div>
             ) : (
-              <div className="flex gap-2">
+              <div className="flex items-center gap-4 border-t border-border bg-background pt-4">
+                <button onClick={onStartReject} className="min-h-12 px-1.5 text-sm font-semibold text-accent">Decline</button>
                 <button onClick={onAccept} disabled={acceptPending}
-                  className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-primary py-2.5 text-sm font-semibold text-white hover:bg-primary/90 disabled:opacity-50">
-                  <CheckCircle2 className="h-4 w-4" /> Accept
-                </button>
-                <button onClick={onStartReject}
-                  className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border py-2.5 text-sm font-medium hover:bg-muted">
-                  <XCircle className="h-4 w-4" /> Decline
+                  className="button-primary flex-1">
+                  {acceptPending ? 'Approving…' : 'Approve loan'}
                 </button>
               </div>
             )

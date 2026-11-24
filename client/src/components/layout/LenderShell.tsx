@@ -1,117 +1,87 @@
-import { Outlet, NavLink, useNavigate, Link } from 'react-router-dom'
+import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
 import { NotificationBell } from './NotificationBell'
-import { Home, FileText, Users, User, LogOut, Plus } from 'lucide-react'
+import { Home, FileText, Users, User, LogOut } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { ThemeToggle } from '@/components/shared/ThemeToggle'
 
 const navItems = [
-  { to: '/lender', label: 'Home', icon: Home, end: true },
-  { to: '/lender/requests', label: 'Requests', icon: Users },
-  { to: '/lender/loans', label: 'My Loans', icon: FileText },
+  { to: '/lender', label: 'Desk', icon: Home, end: true },
+  { to: '/lender/requests', label: 'Applications', icon: Users },
+  { to: '/lender/loans', label: 'Portfolio', icon: FileText },
   { to: '/lender/profile', label: 'Profile', icon: User },
 ]
 
 export function LenderShell() {
   const { user, signOut } = useAuth()
   const navigate = useNavigate()
+  const { pathname } = useLocation()
+  const screen = pathname.startsWith('/lender/requests') ? 'Applications'
+    : pathname.startsWith('/lender/loans') || pathname.startsWith('/lender/commitments') ? 'Portfolio'
+    : pathname.startsWith('/lender/profile') ? 'Profile'
+    : pathname.startsWith('/lender/listing') || pathname.startsWith('/lender/new-loan') ? 'New offer'
+    : 'Lending desk'
   const initial = user?.name?.[0]?.toUpperCase() ?? '?'
 
   return (
     <div className="flex h-dvh bg-background">
       {/* Desktop sidebar — dark */}
-      <aside className="hidden md:flex w-64 flex-shrink-0 flex-col bg-sidebar">
-        <div className="px-6 py-6">
-          <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-xl bg-lime flex items-center justify-center shadow-sm">
-              <span className="text-xs font-bold text-lime-foreground">L</span>
-            </div>
-            <span className="font-bold text-base tracking-tight text-white">LendFlow</span>
-          </div>
-          <p className="text-[11px] text-white/45 mt-1 ml-10 tracking-wide">Capital Partner Portal</p>
+      <aside className="hidden md:flex w-64 flex-shrink-0 flex-col border-r border-border bg-background">
+        <div className="px-6 py-8">
+          <p className="brand-caps text-foreground">Lendflow</p>
         </div>
-        <nav className="flex-1 px-3 py-4 space-y-1">
+        <nav className="flex-1 space-y-1 px-3 py-2">
           {navItems.map(({ to, label, icon: Icon, end }) => (
             <NavLink key={to} to={to} end={end}
               className={({ isActive }) => cn(
-                'flex min-h-11 items-center gap-3 rounded-xl px-3.5 text-sm font-medium transition-all',
-                isActive
-                  ? 'bg-primary text-white shadow-sm'
-                  : 'text-white/60 hover:bg-white/10 hover:text-white'
+                'flex min-h-11 items-center gap-3 px-3.5 text-sm transition-colors',
+                isActive ? 'font-semibold text-accent' : 'font-normal text-muted-foreground hover:text-foreground'
               )}
             >
-              <Icon className="h-4 w-4 flex-shrink-0" />{label}
+              <Icon className="h-4 w-4 flex-shrink-0" strokeWidth={1.4} />{label}
             </NavLink>
           ))}
         </nav>
-        <div className="px-3 py-4 border-t border-white/10">
-          <div className="flex items-center gap-2.5 px-3 py-2 mb-0.5">
-            <div className="h-7 w-7 rounded-full bg-white/10 flex items-center justify-center flex-shrink-0">
-              <span className="text-xs font-bold text-white">{initial}</span>
+        <div className="border-t border-border px-3 py-4">
+          <div className="mb-0.5 flex items-center gap-2.5 px-3 py-2">
+            <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full border border-foreground">
+              <span className="font-serif text-xs">{initial}</span>
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate leading-tight text-white">{user?.name}</p>
-              <p className="text-[11px] text-white/40">Lender</p>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-medium leading-tight">{user?.name}</p>
+              <p className="text-[11px] text-muted-foreground">Lender</p>
             </div>
           </div>
           <button onClick={async () => { await signOut(); navigate('/login') }}
-            className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-sm text-white/60 hover:bg-white/10 hover:text-white transition-colors">
-            <LogOut className="h-4 w-4" />Sign out
+            className="flex w-full items-center gap-2.5 px-3 py-2 text-sm text-muted-foreground hover:text-foreground">
+            <LogOut className="h-4 w-4" strokeWidth={1.4} />Sign out
           </button>
         </div>
       </aside>
 
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header */}
-        <header className="bg-background/85 backdrop-blur-xl border-b border-border/70 flex items-center justify-between gap-2 px-3 md:px-8 sticky top-0 z-30 pt-[env(safe-area-inset-top)] min-h-16">
-          <div className="flex items-center gap-2 md:hidden min-w-0">
-            <div className="h-6 w-6 rounded-lg bg-primary flex items-center justify-center shrink-0">
-              <span className="text-[10px] font-bold text-white">L</span>
-            </div>
-            <span className="font-bold text-sm truncate">LendFlow</span>
-          </div>
-          <div className="hidden md:block text-sm font-semibold">Capital Partner Portal</div>
-          <div className="flex items-center gap-1 shrink-0">
-            <button
-              onClick={async () => { await signOut(); navigate('/login') }}
-              aria-label="Sign out"
-              className="md:hidden flex h-11 w-11 items-center justify-center rounded-lg border border-border text-muted-foreground hover:bg-muted hover:text-destructive transition-colors"
-            >
-              <LogOut className="h-4 w-4" />
-            </button>
-            <Link to="/lender/new-loan"
-              aria-label="New loan"
-              className="flex h-11 items-center gap-1.5 rounded-full px-3 text-sm font-semibold shadow-sm hover:brightness-105 transition-all"
-              style={{ background: 'hsl(var(--lime))', color: 'hsl(var(--lime-foreground))' }}>
-              <Plus className="h-4 w-4" />
-              <span className="hidden sm:inline">New Loan</span>
-            </Link>
-            <ThemeToggle />
+        <header className="sticky top-0 z-30 grid grid-cols-[44px_1fr_44px] items-center bg-background px-3.5 pt-[env(safe-area-inset-top)]">
+          <span />
+          <p className="brand-caps text-center text-foreground">{screen}</p>
+          <div className="flex justify-end">
             <NotificationBell />
-            <div className="flex items-center gap-1.5 rounded-full border border-border bg-muted/50 px-2.5 py-1.5">
-              <div className="h-4 w-4 rounded-full bg-primary/15 flex items-center justify-center">
-                <span className="text-[9px] font-bold text-primary">{initial}</span>
-              </div>
-              <span className="text-xs font-medium hidden sm:block">{user?.name?.split(' ')[0]}</span>
-            </div>
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 pb-24 md:p-8 md:pb-10">
+        <main className="flex-1 overflow-y-auto overflow-x-hidden pb-24 md:p-8 md:pb-10">
           <Outlet />
         </main>
 
-        {/* Mobile bottom nav */}
-        <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 border-t border-border/70 bg-background/90 backdrop-blur-xl pb-[env(safe-area-inset-bottom)]">
+        <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background px-2.5 pb-[max(10px,env(safe-area-inset-bottom))] pt-1 md:hidden">
           <div className="flex">
             {navItems.map(({ to, label, icon: Icon, end }) => (
               <NavLink key={to} to={to} end={end}
                 className={({ isActive }) => cn(
-                  'flex-1 flex flex-col items-center justify-center gap-0.5 min-h-14 px-1 text-[11px] font-medium transition-colors',
-                  isActive ? 'text-primary' : 'text-muted-foreground'
+                  'flex min-h-[54px] flex-1 flex-col items-center justify-center gap-[5px] text-[11.5px]',
+                  isActive ? 'font-semibold text-accent' : 'font-normal text-muted-foreground'
                 )}
               >
-                <Icon className="h-5 w-5" />
+                <Icon className="h-[19px] w-[19px]" strokeWidth={1.4} />
                 <span className="leading-none">{label}</span>
               </NavLink>
             ))}

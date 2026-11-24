@@ -6,7 +6,7 @@ import { formatCents, useCurrency } from '@/lib/utils'
 import { CardSkeleton } from '@/components/shared/LoadingSkeleton'
 import { CommitmentCard, type DashboardLoan } from '@/features/lender/CommitmentCard'
 import type { FundingCommitment } from '@lendflow/shared'
-import { ChevronRight, TrendingUp, Settings2 } from 'lucide-react'
+import { ChevronRight, Plus } from 'lucide-react'
 
 const RATE_PERIOD_LABELS: Record<string, string> = {
   per_15_days: '/ 15 days', per_30_days: '/ 30 days',
@@ -73,125 +73,80 @@ export function PortfolioDashboard() {
     </div>
   )
 
-  return (
-    <div className="max-w-5xl mx-auto space-y-7">
-      {/* Greeting */}
-      <div>
-        <h1 className="page-heading">Hi, {user?.name?.split(' ')[0]} 👋</h1>
-        <p className="text-sm text-muted-foreground mt-1.5">
-          {listing ? `Your listing is ${listing.status}` : 'Set up your listing to start receiving requests'}
-        </p>
-      </div>
+  const openLoans = (commitments ?? []).filter(c => ['active', 'repaying'].includes(c.status) || ['active', 'repaying', 'funding', 'fully_funded'].includes(c.loans?.status))
 
-      {/* My Listing status card */}
+  return (
+    <div className="mx-auto max-w-lg">
+      <section className="px-6 pb-[26px] pt-[34px] text-center">
+        <p className="caps">Capital deployed</p>
+        <p className="num mt-3 text-[68px] leading-none tracking-[-0.035em]">{formatCents(summary?.total_committed ?? 0)}</p>
+        <div className="mx-auto mt-6 grid max-w-xs grid-cols-[1fr_1px_1fr] items-center">
+          <div>
+            <p className="num text-2xl text-accent">{formatCents(summary?.total_yield_earned ?? 0)}</p>
+            <p className="mt-1 text-xs text-muted-foreground">Yield earned</p>
+          </div>
+          <div className="mx-auto h-10 w-px bg-border" />
+          <div>
+            <p className="num text-2xl">{summary?.active_loans ?? openLoans.length}</p>
+            <p className="mt-1 text-xs text-muted-foreground">Active loans</p>
+          </div>
+        </div>
+      </section>
+
+      <div className="flex items-end justify-between border-b border-foreground px-6 pb-2.5">
+        <p className="caps">Your offers</p>
+        <Link to="/lender/listing" className="inline-flex items-center gap-1 text-[13px] font-semibold text-accent">
+          <Plus className="h-3.5 w-3.5" strokeWidth={1.75} /> New offer
+        </Link>
+      </div>
       {listing ? (
-        <Link to="/lender/listing" className="block card-base interactive-card p-5 md:p-6">
-          <div className="flex items-start justify-between">
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <span className={`h-2 w-2 rounded-full ${listing.status === 'active' ? 'bg-primary' : 'bg-amber-400'}`} />
-                <span className="text-xs font-medium capitalize text-muted-foreground">{listing.status}</span>
-              </div>
-              <div className="flex items-baseline gap-1">
-                <span className="text-3xl font-bold text-primary">{(listing.interest_rate * 100).toFixed(1)}%</span>
-                <span className="text-sm text-muted-foreground">{RATE_PERIOD_LABELS[listing.rate_period]}</span>
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                {formatCents(listing.min_loan)} – {formatCents(listing.max_loan)} · {formatCents(listing.available_amount)} available
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <Settings2 className="h-4 w-4 text-muted-foreground" />
-              <ChevronRight className="h-4 w-4 text-muted-foreground" />
-            </div>
+        <Link to="/lender/listing" className="grid grid-cols-[92px_1fr_auto] items-center gap-3 border-b border-border px-6 py-3.5 hover:bg-card">
+          <p className="num text-[34px] leading-none">{(listing.interest_rate * 100).toFixed(1)}<sup className="text-[0.37em]">%</sup></p>
+          <div className="min-w-0">
+            <p className="text-[13.5px] font-medium">{formatCents(listing.min_loan)} – {formatCents(listing.max_loan)}</p>
+            <p className="text-[12.5px] text-muted-foreground">
+              {RATE_PERIOD_LABELS[listing.rate_period]} · {openLoans.length} active
+              {pendingRequests.length > 0 && <span className="font-serif text-[15px] italic text-accent"> · {pendingRequests.length} new</span>}
+            </p>
           </div>
         </Link>
       ) : (
-        <Link to="/lender/listing"
-          className="flex items-center justify-between rounded-2xl border-2 border-dashed border-border p-5 hover:border-primary hover:bg-primary/5 transition-colors group">
-          <div>
-            <p className="font-semibold group-hover:text-primary transition-colors">Create Your Listing</p>
-            <p className="text-sm text-muted-foreground mt-0.5">Set your rate and available capital</p>
-          </div>
-          <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-            <Settings2 className="h-5 w-5 text-primary" />
-          </div>
+        <Link to="/lender/listing" className="block border-b border-border px-6 py-6 text-[13.5px] font-medium">
+          Set your terms. Borrowers apply to this offer.
         </Link>
       )}
+      <Link to="/lender/new-loan" className="block border-b border-border px-6 py-3.5 text-[13.5px] text-muted-foreground hover:bg-card">
+        Track a loan from chat
+      </Link>
 
-      {/* Pending requests alert */}
-      {pendingRequests.length > 0 && (
-        <Link to="/lender/requests"
-          className="flex items-center gap-3 rounded-2xl p-4 active:scale-[0.99] transition-transform"
-          style={{ background: 'hsl(var(--lime))' }}>
-          <div className="h-10 w-10 rounded-full bg-black/10 flex items-center justify-center flex-shrink-0">
-            <span className="font-bold text-sm text-foreground">{pendingRequests.length}</span>
-          </div>
-          <div className="flex-1">
-            <p className="font-semibold text-sm text-foreground">
-              {pendingRequests.length} new request{pendingRequests.length !== 1 ? 's' : ''}
-            </p>
-            <p className="text-xs text-foreground/70">Tap to review and accept</p>
-          </div>
-          <ChevronRight className="h-4 w-4 text-foreground/70" />
+      <div className="mt-[22px] flex items-end justify-between border-b border-foreground px-6 pb-2.5">
+        <p className="caps">Awaiting your decision</p>
+      </div>
+      {pendingRequests.length === 0 ? (
+        <p className="px-6 py-6 text-[12.5px] text-muted-foreground">No applications waiting.</p>
+      ) : pendingRequests.map(request => (
+        <Link key={request.id} to="/lender/requests" className="flex min-h-14 items-center gap-3.5 border-b border-border px-6 hover:bg-card">
+          <span className="flex h-9 w-9 items-center justify-center rounded-full border border-foreground font-serif text-lg">{request.users?.name?.[0] ?? '—'}</span>
+          <span className="min-w-0 flex-1">
+            <span className="num block text-lg">{formatCents(request.amount_requested)}</span>
+            <span className="block text-[12.5px] text-muted-foreground">{request.purpose.replaceAll('_', ' ')} · {request.users?.name ?? 'Borrower'}</span>
+          </span>
+          <ChevronRight className="h-4 w-4" strokeWidth={1.5} />
         </Link>
-      )}
+      ))}
 
-      {/* Portfolio KPIs */}
-      {(summary?.active_loans ?? 0) > 0 && (
-        <section>
-          <h2 className="font-semibold text-sm mb-2">Portfolio</h2>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            {[
-              { label: 'Active Loans', value: String(summary?.active_loans ?? 0), sub: 'commitments' },
-              { label: 'Committed', value: formatCents(summary?.total_committed ?? 0), sub: 'deployed' },
-              { label: 'Yield Earned', value: formatCents(summary?.total_yield_earned ?? 0), sub: 'interest income', accent: true },
-              { label: 'Projected', value: formatCents(summary?.projected_future_yield ?? 0), sub: 'remaining yield' },
-            ].map(({ label, value, sub, accent }) => (
-              <div key={label} className="card-dark p-4">
-                <p className="text-xs text-white/50">{label}</p>
-                <p className={`text-base sm:text-lg font-bold mt-0.5 break-words ${accent ? '' : 'text-white'}`}
-                  style={accent ? { color: 'hsl(var(--lime))' } : {}}>
-                  {value}
-                </p>
-                <p className="text-[11px] text-white/40">{sub}</p>
-              </div>
-            ))}
+      {openLoans.length > 0 && (
+        <section className="mt-8 space-y-3 px-6">
+          <div className="flex items-end justify-between border-b border-foreground pb-2.5">
+            <p className="caps">Open loans</p>
+            <Link to="/lender/loans" className="text-[13px] font-semibold text-accent">View all</Link>
           </div>
+          {openLoans.slice(0, 5).map(c => (
+            <CommitmentCard key={c.id} id={c.id} amount={c.amount} loan={c.loans} />
+          ))}
         </section>
       )}
-
-      {/* Active commitments */}
-      {(commitments?.length ?? 0) > 0 && (
-        <section>
-          <div className="flex items-center justify-between mb-2">
-            <h2 className="font-semibold text-sm">Active Loans</h2>
-            <Link to="/lender/loans" className="text-xs font-semibold text-primary hover:underline">View all</Link>
-          </div>
-          <div className="grid gap-3 lg:grid-cols-2">
-            {(commitments ?? [])
-              .filter(c => ['active', 'repaying'].includes(c.status) || ['active', 'repaying', 'funding', 'fully_funded'].includes(c.loans?.status))
-              .slice(0, 5)
-              .map(c => (
-                <CommitmentCard key={c.id} id={c.id} amount={c.amount} loan={c.loans} />
-              ))}
-          </div>
-        </section>
-      )}
-
-      {/* Empty — no listing, no loans */}
-      {!listing && !(commitments?.length) && (
-        <div className="text-center py-8 space-y-2">
-          <TrendingUp className="h-10 w-10 text-muted-foreground mx-auto" />
-          <p className="font-medium">Start lending</p>
-          <p className="text-sm text-muted-foreground">Create a listing to let borrowers find you</p>
-          <Link to="/lender/listing"
-            className="inline-block mt-2 rounded-full px-6 py-2.5 text-sm font-semibold hover:brightness-105 transition-all"
-            style={{ background: 'hsl(var(--lime))', color: 'hsl(var(--lime-foreground))' }}>
-            Create Listing
-          </Link>
-        </div>
-      )}
+      <p className="sr-only">{user?.name}</p>
     </div>
   )
 }

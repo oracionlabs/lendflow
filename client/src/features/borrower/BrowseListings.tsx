@@ -3,10 +3,8 @@ import { Link } from 'react-router-dom'
 import { useState } from 'react'
 import api from '@/lib/api'
 import { formatCents, useCurrency } from '@/lib/utils'
-import { Search, SlidersHorizontal, ChevronRight } from 'lucide-react'
+import { SlidersHorizontal } from 'lucide-react'
 import { LOAN_PURPOSE_LABELS } from '@lendflow/shared'
-import { CardSkeleton } from '@/components/shared/LoadingSkeleton'
-import { EmptyState } from '@/components/shared/EmptyState'
 
 const RATE_PERIOD_LABELS: Record<string, string> = {
   per_15_days: '/ 15 days', per_30_days: '/ 30 days',
@@ -28,8 +26,6 @@ interface Listing {
   users: { name: string; avatar_url: string | null; lender_profiles: { lender_type: string | null; accredited: boolean } | null }
 }
 
-const AVATAR_COLORS = ['bg-emerald-100 text-emerald-700', 'bg-blue-100 text-blue-700', 'bg-amber-100 text-amber-700', 'bg-purple-100 text-purple-700', 'bg-teal-100 text-teal-700']
-
 export function BrowseListings() {
   useCurrency() // subscribe to currency changes
   const [search, setSearch] = useState('')
@@ -43,7 +39,8 @@ export function BrowseListings() {
     },
   })
 
-  const filtered = (data ?? []).filter(l => {
+  const ranked = [...(data ?? [])].sort((a, b) => a.interest_rate - b.interest_rate)
+  const filtered = ranked.filter(l => {
     if (!search) return true
     const q = search.toLowerCase()
     return (
@@ -54,110 +51,87 @@ export function BrowseListings() {
   })
 
   return (
-    <div className="space-y-4 max-w-2xl mx-auto">
-      <div>
-        <h1 className="text-xl font-bold">Find a Lender</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">Browse available lenders and their terms</p>
+    <div className="mx-auto max-w-lg">
+      <div className="flex justify-end px-3.5">
+        <button
+          type="button"
+          onClick={() => setShowFilters(open => !open)}
+          aria-label="Filter"
+          className="flex h-11 w-11 items-center justify-center text-foreground"
+        >
+          <SlidersHorizontal className="h-5 w-5" strokeWidth={1.4} />
+        </button>
       </div>
-
-      {/* Search */}
-      <div className="flex gap-2">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+      {showFilters && (
+        <div className="px-6 pb-2">
+          <label className="caps text-[10px] text-muted-foreground" htmlFor="lender-search">Search</label>
           <input
+            id="lender-search"
             type="text"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Search lenders, purposes…"
-            className="w-full rounded-xl border bg-white pl-9 pr-3 py-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            placeholder="Lender or purpose"
+            className="mt-1 w-full border-0 border-b border-foreground bg-transparent px-0 py-2 font-serif text-[22px] shadow-none"
           />
         </div>
-        <button
-          onClick={() => setShowFilters(f => !f)}
-          className={`min-h-11 min-w-11 rounded-xl border px-3 flex items-center justify-center gap-1.5 text-sm font-medium transition-colors ${showFilters ? 'bg-primary text-white border-primary' : 'bg-card hover:bg-muted'}`}
-        >
-          <SlidersHorizontal className="h-4 w-4" />
-          <span className="hidden sm:inline">Filter</span>
-        </button>
-      </div>
-
-      {/* Results count */}
-      {!isLoading && (
-        <p className="text-xs text-muted-foreground">{filtered.length} lender{filtered.length !== 1 ? 's' : ''} available</p>
       )}
 
-      {/* Listing cards */}
-      {isLoading ? (
-        <div className="space-y-3">{Array.from({ length: 4 }).map((_, i) => <CardSkeleton key={i} />)}</div>
-      ) : filtered.length === 0 ? (
-        <EmptyState icon={Search} title="No lenders found" description="Try adjusting your search or check back later." />
-      ) : (
-        <div className="space-y-3">
-          {filtered.map((listing, i) => {
-            const avatarColor = AVATAR_COLORS[listing.users?.name?.charCodeAt(0) % AVATAR_COLORS.length] ?? AVATAR_COLORS[0]
-            const rateLabel = `${(listing.interest_rate * 100).toFixed(1)}% ${RATE_PERIOD_LABELS[listing.rate_period] ?? ''}`
+      <div className="px-6 pb-[22px] pt-[26px]">
+        <p className="caps">Your request</p>
+        <p className="mt-2.5 font-serif text-[27px] leading-[1.3] tracking-[-0.01em]">
+          {search
+            ? <>Showing offers matching <span className="italic text-accent underline decoration-accent underline-offset-4">{search}</span>.</>
+            : 'Showing every open offer, lowest rate first.'}
+        </p>
+      </div>
 
+      <div className="flex items-end justify-between border-b border-foreground px-6 pb-2.5">
+        <p className="caps">{isLoading ? 'Offers' : filtered.length === 0 ? 'No offers' : `${filtered.length} offer${filtered.length === 1 ? '' : 's'}`}</p>
+        <p className="caps text-muted-foreground">By rate</p>
+      </div>
+
+      {isLoading ? (
+        <div role="status" className="px-6">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="grid grid-cols-[104px_1fr_auto] items-center gap-3 border-b border-border py-4">
+              <div className="h-7 w-16 bg-border" />
+              <div className="space-y-2">
+                <div className="h-3 w-[70%] bg-border" />
+                <div className="h-3 w-[45%] bg-border" />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="px-6 pt-14 text-center">
+          <p className="font-serif text-2xl">No lenders match {search || 'this request'}.</p>
+          <button type="button" onClick={() => setSearch('')} className="mt-6 text-sm font-semibold text-accent">Clear the search</button>
+        </div>
+      ) : (
+        <div>
+          {filtered.map((listing, index) => {
+            const rate = (listing.interest_rate * 100).toFixed(1)
+            const range = `${formatCents(listing.min_loan)} · ${listing.max_term_months ? `${listing.max_term_months} mo` : 'Open term'}`
+            const kind = listing.users?.lender_profiles?.lender_type ?? 'Individual'
             return (
               <Link
                 key={listing.id}
                 to={`/borrower/lenders/${listing.id}`}
-                className="block card-base p-4 hover:shadow-card-md transition-shadow active:scale-[0.99]"
+                className="grid min-h-[84px] grid-cols-[104px_1fr_auto] items-center gap-3 border-b border-border px-6 py-4 hover:bg-card"
               >
-                <div className="flex items-start gap-3">
-                  {/* Avatar */}
-                  <div className={`h-11 w-11 rounded-full flex items-center justify-center text-base font-bold flex-shrink-0 ${avatarColor}`}>
-                    {listing.users?.name?.[0]?.toUpperCase() ?? '?'}
-                  </div>
-
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <p className="font-semibold text-sm">{listing.users?.name}</p>
-                        <p className="text-xs text-muted-foreground capitalize">
-                          {listing.users?.lender_profiles?.lender_type ?? 'Individual'} lender
-                          {listing.users?.lender_profiles?.accredited && ' · Accredited'}
-                        </p>
-                      </div>
-                      <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
-                    </div>
-
-                    {/* Rate — prominent */}
-                    <div className="mt-2.5 flex items-baseline gap-1">
-                      <span className="text-2xl font-bold text-primary">{(listing.interest_rate * 100).toFixed(1)}%</span>
-                      <span className="text-sm text-muted-foreground">{RATE_PERIOD_LABELS[listing.rate_period]}</span>
-                    </div>
-
-                    {/* Key info pills */}
-                    <div className="mt-2 flex flex-wrap gap-1.5">
-                      <span className="rounded-full bg-muted px-2.5 py-1 text-[11px] font-medium">
-                        Up to {formatCents(listing.max_loan ?? listing.available_amount)}
-                      </span>
-                      {listing.max_term_months && (
-                        <span className="rounded-full bg-muted px-2.5 py-1 text-[11px] font-medium">
-                          Max {listing.max_term_months}mo
-                        </span>
-                      )}
-                      {listing.accepted_purposes?.slice(0, 2).map(p => (
-                        <span key={p} className="rounded-full bg-muted px-2.5 py-1 text-[11px] font-medium">
-                          {LOAN_PURPOSE_LABELS[p] ?? p}
-                        </span>
-                      ))}
-                      {(listing.accepted_purposes?.length ?? 0) > 2 && (
-                        <span className="rounded-full bg-muted px-2.5 py-1 text-[11px] text-muted-foreground">
-                          +{listing.accepted_purposes.length - 2} more
-                        </span>
-                      )}
-                      {(listing.listing_packages?.length ?? 0) > 0 && (
-                        <span className="rounded-full bg-primary/10 text-primary px-2.5 py-1 text-[11px] font-medium">
-                          {listing.listing_packages.length} package{listing.listing_packages.length !== 1 ? 's' : ''}
-                        </span>
-                      )}
-                    </div>
-
-                    {listing.description && (
-                      <p className="mt-2 text-xs text-muted-foreground line-clamp-2">{listing.description}</p>
-                    )}
-                  </div>
+                <p className="num text-[34px] leading-none md:text-[34px]">
+                  {rate}<sup className="ml-0.5 align-super text-[0.37em]">%</sup>
+                </p>
+                <div className="min-w-0">
+                  <p className={`caps text-[10px] ${index === 0 ? 'text-accent' : 'text-foreground'}`}>
+                    {index === 0 ? 'Lowest rate' : (RATE_PERIOD_LABELS[listing.rate_period] ?? 'Offer')}
+                  </p>
+                  <p className="mt-1 truncate text-[13.5px] font-medium capitalize">{listing.users?.name} · {kind}</p>
+                  <p className="text-[12.5px] text-muted-foreground">{range}</p>
+                </div>
+                <div className="text-right">
+                  <p className="num text-xl leading-none">{formatCents(listing.max_loan ?? listing.available_amount)}</p>
+                  <p className="mt-1 text-[11.5px] text-muted-foreground">up to</p>
                 </div>
               </Link>
             )

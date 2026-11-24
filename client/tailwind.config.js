@@ -13,7 +13,8 @@ export default {
     },
     extend: {
       fontFamily: {
-        sans: ['DM Sans', 'system-ui', 'sans-serif'],
+        sans: ['Hanken Grotesk', 'Helvetica Neue', 'system-ui', 'sans-serif'],
+        serif: ['Newsreader', 'Iowan Old Style', 'Georgia', 'serif'],
       },
       boxShadow: {
         'card': '0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)',

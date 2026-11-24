@@ -3,54 +3,31 @@
 @tailwind utilities;
 
 @layer base {
-  :root {
-    --background: 250 32% 97%;
-    --foreground: 252 30% 12%;
-    --card: 0 0% 100%;
-    --card-foreground: 252 30% 12%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 252 30% 12%;
-    --primary: 254 57% 52%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 248 24% 94%;
-    --secondary-foreground: 252 30% 12%;
-    --muted: 248 22% 94%;
-    --muted-foreground: 250 9% 43%;
-    --accent: 250 32% 92%;
-    --accent-foreground: 252 30% 12%;
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 100%;
-    --border: 250 18% 86%;
-    --input: 250 18% 82%;
-    --ring: 254 57% 52%;
-    --radius: 0.875rem;
-
-    /* Design accents */
-    --lime: 75 75% 65%;
-    --lime-foreground: 252 30% 12%;
-    --sidebar-bg: 252 31% 12%;
-  }
-
+  :root,
   .dark {
-    --background: 258 30% 8%;
-    --foreground: 0 0% 98%;
-    --card: 258 28% 12%;
-    --card-foreground: 0 0% 98%;
-    --popover: 258 28% 12%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 254 70% 68%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 258 20% 18%;
-    --secondary-foreground: 0 0% 90%;
-    --muted: 258 20% 16%;
-    --muted-foreground: 252 10% 60%;
-    --accent: 258 20% 18%;
-    --accent-foreground: 262 80% 70%;
-    --destructive: 0 62% 50%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 258 18% 22%;
-    --input: 258 18% 22%;
-    --ring: 254 70% 68%;
+    --background: 40 23% 91%;
+    --foreground: 222 31% 15%;
+    --card: 40 33% 95%;
+    --card-foreground: 222 31% 15%;
+    --popover: 40 33% 95%;
+    --popover-foreground: 222 31% 15%;
+    --primary: 222 31% 15%;
+    --primary-foreground: 40 33% 95%;
+    --secondary: 40 23% 91%;
+    --secondary-foreground: 222 31% 15%;
+    --muted: 40 18% 90%;
+    --muted-foreground: 226 10% 40%;
+    --accent: 350 54% 31%;
+    --accent-foreground: 40 33% 95%;
+    --destructive: 350 54% 31%;
+    --destructive-foreground: 40 33% 95%;
+    --border: 40 13% 79%;
+    --input: 222 31% 15%;
+    --ring: 222 31% 15%;
+    --radius: 0px;
+    --lime: 350 54% 31%;
+    --lime-foreground: 40 33% 95%;
+    --sidebar-bg: 222 31% 15%;
   }
 }
 
@@ -64,14 +41,11 @@
   }
   body {
     @apply bg-background text-foreground;
-    font-family: 'DM Sans', system-ui, sans-serif;
+    font-family: 'Hanken Grotesk', 'Helvetica Neue', system-ui, sans-serif;
     font-feature-settings: "rlig" 1, "calt" 1;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     overflow-x: hidden;
-    background-image:
-      radial-gradient(circle at 12% -8%, hsl(var(--primary) / 0.08), transparent 30rem),
-      radial-gradient(circle at 94% 2%, hsl(var(--lime) / 0.08), transparent 24rem);
   }
   #root {
     min-height: 100%;
@@ -122,35 +96,54 @@
   }
 }
 
-/* Card elevation system */
-.card-base {
-  @apply rounded-2xl bg-card border border-border/80;
-  box-shadow: 0 1px 2px rgba(25, 20, 45, 0.035), 0 10px 28px rgba(25, 20, 45, 0.045);
+.num {
+  font-family: Newsreader, 'Iowan Old Style', Georgia, serif;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
 }
 
-.card-elevated {
-  @apply rounded-2xl bg-card border border-border/80;
-  box-shadow: 0 16px 44px rgba(25, 20, 45, 0.11), 0 2px 8px rgba(25, 20, 45, 0.05);
+.caps {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
 }
 
-/* Dark card — for hero stats and featured sections */
-.card-dark {
-  @apply rounded-2xl;
-  background: hsl(var(--sidebar-bg));
-  background-image: linear-gradient(145deg, hsl(var(--sidebar-bg)), hsl(252 34% 17%));
-  box-shadow: 0 14px 34px rgba(25, 20, 45, 0.16);
+.brand-caps {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
 }
 
-/* Lime card — for alerts and CTAs */
-.card-lime {
-  @apply rounded-2xl;
-  background: hsl(var(--lime));
-  box-shadow: inset 0 0 0 1px hsl(var(--lime-foreground) / 0.08);
+/* Hairline surfaces. Corners stay square; only seals and chips stay round. */
+.rounded-xl,
+.rounded-2xl,
+.rounded-lg,
+.rounded-md {
+  border-radius: 0;
 }
 
+.card-base,
+.card-elevated,
 .card-ring {
-  @apply rounded-2xl bg-card;
-  box-shadow: 0 0 0 2px hsl(var(--primary)), 0 12px 30px hsl(var(--primary) / 0.14);
+  @apply border border-border bg-card;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.card-dark {
+  background: hsl(var(--foreground));
+  color: hsl(var(--card));
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.card-lime {
+  background: transparent;
+  color: hsl(var(--accent));
+  box-shadow: none;
 }
 
 /* Shared page rhythm and interactive surfaces */
@@ -159,23 +152,23 @@
 }
 
 .page-heading {
-  @apply text-2xl font-bold leading-tight sm:text-3xl;
+  @apply font-serif text-[34px] font-normal leading-[1.15] tracking-[-0.02em];
 }
 
 .section-label {
-  @apply text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground;
+  @apply caps text-foreground;
 }
 
 .interactive-card {
-  @apply transition-[transform,box-shadow,border-color,background-color] duration-200 hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-card-md active:translate-y-0;
+  @apply transition-colors duration-150 hover:bg-card;
 }
 
 .button-primary {
-  @apply inline-flex min-h-11 items-center justify-center rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm transition-[transform,background-color,box-shadow] hover:bg-primary/90 hover:shadow-card active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50;
+  @apply inline-flex min-h-[52px] items-center justify-center bg-primary px-4 text-[14.5px] font-semibold tracking-[0.02em] text-primary-foreground transition-opacity hover:opacity-90 disabled:pointer-events-none disabled:opacity-50;
 }
 
 .button-secondary {
-  @apply inline-flex min-h-11 items-center justify-center rounded-xl border border-border bg-card px-4 text-sm font-medium transition-colors hover:bg-muted;
+  @apply inline-flex min-h-12 items-center justify-center px-1.5 text-sm font-semibold text-accent;
 }
 
 /* Tab underline */
