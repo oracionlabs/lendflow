@@ -442,7 +442,7 @@ router.get('/:id/requests', requireBorrower, async (req: Request, res: Response)
   if (!loan || loan.borrower_id !== user.id) { res.status(404).json({ error: 'Loan not found' }); return }
   const { data, error } = await db
     .from('borrower_requests')
-    .select('id, kind, requested_due_date, amount, status, created_at')
+    .select('id, kind, requested_due_date, amount, note, receipt_url, status, created_at')
     .eq('loan_id', req.params.id)
     .order('created_at', { ascending: false })
   if (error) { res.status(500).json({ error: error.message }); return }
@@ -451,7 +451,12 @@ router.get('/:id/requests', requireBorrower, async (req: Request, res: Response)
 
 router.post('/:id/requests', requireBorrower, async (req: Request, res: Response): Promise<void> => {
   const user = res.locals.user
-  const { kind, due_date } = req.body as { kind?: 'extension' | 'interest_only' | 'pay_in_full'; due_date?: string }
+  const { kind, due_date, note, receipt_url } = req.body as {
+    kind?: 'extension' | 'interest_only' | 'pay_in_full'
+    due_date?: string
+    note?: string
+    receipt_url?: string
+  }
   if (kind !== 'extension' && kind !== 'interest_only' && kind !== 'pay_in_full') {
     res.status(400).json({ error: 'Choose an extension, an interest-only payment, or pay in full' })
     return
@@ -520,6 +525,15 @@ router.post('/:id/requests', requireBorrower, async (req: Request, res: Response
     requestedDue = due_date ?? null
   }
 
+  const noteText = typeof note === 'string' ? note.trim().slice(0, 500) : ''
+  const receipt = typeof receipt_url === 'string' && receipt_url.startsWith('data:image/')
+    ? receipt_url.slice(0, 5_500_000)
+    : null
+  if (typeof receipt_url === 'string' && receipt_url.length > 0 && !receipt) {
+    res.status(400).json({ error: 'Upload a receipt image' })
+    return
+  }
+
   const { data: existing } = await db
     .from('borrower_requests')
     .select('id')
@@ -528,18 +542,20 @@ router.post('/:id/requests', requireBorrower, async (req: Request, res: Response
     .eq('status', 'pending')
     .maybeSingle()
 
+  const payload = {
+    requested_due_date: requestedDue,
+    amount,
+    note: noteText || null,
+    receipt_url: receipt,
+  }
   const saved = existing
-    ? await db.from('borrower_requests').update({
-        requested_due_date: requestedDue,
-        amount,
-      }).eq('id', existing.id).select('id, kind, requested_due_date, amount, status, created_at').single()
+    ? await db.from('borrower_requests').update(payload).eq('id', existing.id).select('id, kind, requested_due_date, amount, note, receipt_url, status, created_at').single()
     : await db.from('borrower_requests').insert({
         loan_id: loan.id,
         borrower_id: user.id,
         kind,
-        requested_due_date: requestedDue,
-        amount,
-      }).select('id, kind, requested_due_date, amount, status, created_at').single()
+        ...payload,
+      }).select('id, kind, requested_due_date, amount, note, receipt_url, status, created_at').single()
 
   if (saved.error) { res.status(500).json({ error: saved.error.message }); return }
 
@@ -557,8 +573,12 @@ router.post('/:id/requests', requireBorrower, async (req: Request, res: Response
       body: kind === 'extension'
         ? 'A borrower asked to move a due date.'
         : kind === 'pay_in_full'
-          ? 'A borrower asked you to record the full payment calculated through today.'
-          : 'A borrower asked you to record the interest and move the principal due date.',
+          ? receipt || noteText
+            ? 'A borrower sent a pay-off with a note or receipt for you to confirm.'
+            : 'A borrower asked you to confirm a full payment.'
+          : receipt || noteText
+            ? 'A borrower sent an interest payment with a note or receipt for you to confirm.'
+            : 'A borrower asked you to record the interest and move the principal due date.',
       link: `/lender/commitments/${commitment.id}`,
     }).catch(() => undefined)
   }

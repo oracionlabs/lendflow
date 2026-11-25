@@ -1,0 +1,3 @@
+ALTER TABLE borrower_requests
+  ADD COLUMN IF NOT EXISTS note TEXT,
+  ADD COLUMN IF NOT EXISTS receipt_url TEXT;

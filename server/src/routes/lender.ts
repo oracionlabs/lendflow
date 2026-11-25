@@ -939,7 +939,7 @@ router.get('/borrower-requests', async (req: Request, res: Response): Promise<vo
 
   const { data: requests, error: requestError } = await db
     .from('borrower_requests')
-    .select('id, loan_id, kind, requested_due_date, amount, created_at, loans(purpose, product_name, loan_kind, currency, users!borrower_id(name))')
+    .select('id, loan_id, kind, requested_due_date, amount, note, receipt_url, created_at, loans(purpose, product_name, loan_kind, currency, users!borrower_id(name))')
     .in('loan_id', loanIds)
     .eq('status', 'pending')
     .order('created_at', { ascending: true })
@@ -952,6 +952,8 @@ router.get('/borrower-requests', async (req: Request, res: Response): Promise<vo
     kind: string
     requested_due_date: string | null
     amount: number | null
+    note: string | null
+    receipt_url: string | null
     created_at: string
     loans: {
       purpose?: string
@@ -979,6 +981,8 @@ router.get('/borrower-requests', async (req: Request, res: Response): Promise<vo
         kind: row.kind,
         requested_due_date: row.requested_due_date,
         amount: row.amount,
+        note: row.note,
+        receipt_url: row.receipt_url,
         created_at: row.created_at,
         currency: loan?.currency,
         borrower_name: name ?? 'Borrower',

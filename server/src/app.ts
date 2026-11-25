@@ -33,7 +33,7 @@ export function createApp() {
 
   app.use(helmet())
   app.use(cors({ origin: ALLOWED_ORIGINS, credentials: true }))
-  app.use(express.json({ limit: '2mb' }))
+  app.use(express.json({ limit: '6mb' }))
   app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'))
 
   app.get('/health', (_req, res) => res.json({ ok: true, service: 'lendflow-api' }))

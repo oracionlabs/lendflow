@@ -12,6 +12,7 @@ import { quoteAdvance, quoteAsOfToday } from '@lendflow/shared'
 import { loanTitle } from '@/lib/loan-label'
 import { CheckCircle, Clock, AlertCircle, XCircle } from 'lucide-react'
 import { Modal } from '@/components/shared/Modal'
+import { fileToReceiptDataUrl } from '@/lib/receipt'
 
 const CANCEL_REASONS = [
   'No longer need the funds',
@@ -44,6 +45,9 @@ export function ActiveLoanDetail() {
   const [showPay, setShowPay] = useState(false)
   const [showPayFull, setShowPayFull] = useState(false)
   const [interestDueDate, setInterestDueDate] = useState('')
+  const [payNote, setPayNote] = useState('')
+  const [payReceipt, setPayReceipt] = useState<string | null>(null)
+  const [receiptBusy, setReceiptBusy] = useState(false)
 
   const { data: loanPayload, isLoading: loanLoading } = useQuery({
     queryKey: ['loan', id],
@@ -119,7 +123,7 @@ export function ActiveLoanDetail() {
   })
 
   const ask = useMutation({
-    mutationFn: (body: { kind: 'extension' | 'interest_only' | 'pay_in_full'; due_date?: string }) =>
+    mutationFn: (body: { kind: 'extension' | 'interest_only' | 'pay_in_full'; due_date?: string; note?: string; receipt_url?: string }) =>
       api.post(`/api/loans/${id}/requests`, body),
     onSuccess: (_res, body) => {
       qc.invalidateQueries({ queryKey: ['loan-requests', id] })
@@ -129,6 +133,8 @@ export function ActiveLoanDetail() {
       setShowPay(false)
       setShowPayFull(false)
       setInterestDueDate('')
+      setPayNote('')
+      setPayReceipt(null)
       toast.success(
         body.kind === 'pay_in_full'
           ? 'Sent to your lender. The loan closes only after they confirm the payment.'
@@ -371,15 +377,50 @@ export function ActiveLoanDetail() {
                   </dl>
                   <p className="mt-3 text-[13.5px] text-muted-foreground">
                     {instapay
-                      ? 'Send this amount to your lender. The loan stays open until they confirm they received it.'
+                      ? 'Send this amount to your lender. Add a note or receipt screenshot (Messenger, GCash, bank app). The loan stays open until they confirm.'
                       : 'This closes the loan at the amount calculated through today.'}
                   </p>
+                  {instapay && (
+                    <>
+                      <label className="caps mt-6 block" htmlFor="pay-full-note">Note</label>
+                      <input
+                        id="pay-full-note"
+                        value={payNote}
+                        onChange={e => setPayNote(e.target.value)}
+                        placeholder="Reference number, Messenger, GCash…"
+                        className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm"
+                      />
+                      <label className="caps mt-5 block" htmlFor="pay-full-receipt">Receipt</label>
+                      <input
+                        id="pay-full-receipt"
+                        type="file"
+                        accept="image/*"
+                        className="mt-2 w-full text-sm"
+                        onChange={async e => {
+                          const file = e.target.files?.[0]
+                          if (!file) { setPayReceipt(null); return }
+                          setReceiptBusy(true)
+                          try {
+                            setPayReceipt(await fileToReceiptDataUrl(file))
+                          } catch (err) {
+                            toast.error(err instanceof Error ? err.message : 'Could not attach that image')
+                            setPayReceipt(null)
+                          } finally {
+                            setReceiptBusy(false)
+                          }
+                        }}
+                      />
+                      {payReceipt && <img src={payReceipt} alt="Receipt" className="mt-3 max-h-40 w-full border border-border object-contain" />}
+                    </>
+                  )}
                   <div className="mt-6 flex items-center gap-4">
-                    <button type="button" onClick={() => setShowPayFull(false)} className="min-h-12 px-1.5 text-sm font-semibold">Cancel</button>
+                    <button type="button" onClick={() => { setShowPayFull(false); setPayNote(''); setPayReceipt(null) }} className="min-h-12 px-1.5 text-sm font-semibold">Cancel</button>
                     <button
                       type="button"
-                      disabled={instapay ? ask.isPending : payFull.isPending || (!instapay && (walletData?.available_balance ?? 0) < fullAmount)}
-                      onClick={() => instapay ? ask.mutate({ kind: 'pay_in_full' }) : payFull.mutate()}
+                      disabled={receiptBusy || (instapay ? ask.isPending : payFull.isPending || (!instapay && (walletData?.available_balance ?? 0) < fullAmount))}
+                      onClick={() => instapay
+                        ? ask.mutate({ kind: 'pay_in_full', note: payNote || undefined, receipt_url: payReceipt || undefined })
+                        : payFull.mutate()}
                       className="button-primary flex-1"
                     >
                       {(instapay ? ask.isPending : payFull.isPending) ? 'Sending…' : instapay ? `Ask to confirm · ${fmt(fullAmount)}` : `Pay now · ${fmt(fullAmount)}`}
@@ -411,12 +452,47 @@ export function ActiveLoanDetail() {
                   {rollDays > 0 && (
                     <p className="mt-3 text-sm">Principal moves {rollDays} days, to {formatDate(interestDueDate)}.</p>
                   )}
+                  {instapay && (
+                    <>
+                      <label className="caps mt-6 block" htmlFor="pay-interest-note">Note</label>
+                      <input
+                        id="pay-interest-note"
+                        value={payNote}
+                        onChange={e => setPayNote(e.target.value)}
+                        placeholder="Reference number, Messenger, GCash…"
+                        className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm"
+                      />
+                      <label className="caps mt-5 block" htmlFor="pay-interest-receipt">Receipt</label>
+                      <input
+                        id="pay-interest-receipt"
+                        type="file"
+                        accept="image/*"
+                        className="mt-2 w-full text-sm"
+                        onChange={async e => {
+                          const file = e.target.files?.[0]
+                          if (!file) { setPayReceipt(null); return }
+                          setReceiptBusy(true)
+                          try {
+                            setPayReceipt(await fileToReceiptDataUrl(file))
+                          } catch (err) {
+                            toast.error(err instanceof Error ? err.message : 'Could not attach that image')
+                            setPayReceipt(null)
+                          } finally {
+                            setReceiptBusy(false)
+                          }
+                        }}
+                      />
+                      {payReceipt && <img src={payReceipt} alt="Receipt" className="mt-3 max-h-40 w-full border border-border object-contain" />}
+                    </>
+                  )}
                   <div className="mt-6 flex items-center gap-4">
-                    <button type="button" onClick={() => { setShowPay(false); setInterestDueDate('') }} className="min-h-12 px-1.5 text-sm font-semibold">Cancel</button>
+                    <button type="button" onClick={() => { setShowPay(false); setInterestDueDate(''); setPayNote(''); setPayReceipt(null) }} className="min-h-12 px-1.5 text-sm font-semibold">Cancel</button>
                     <button
                       type="button"
-                      disabled={rollDays <= 0 || (instapay ? ask.isPending : payInterest.isPending || (!instapay && (walletData?.available_balance ?? 0) < interestLeft))}
-                      onClick={() => instapay ? ask.mutate({ kind: 'interest_only', due_date: interestDueDate }) : payInterest.mutate(interestDueDate)}
+                      disabled={receiptBusy || rollDays <= 0 || (instapay ? ask.isPending : payInterest.isPending || (!instapay && (walletData?.available_balance ?? 0) < interestLeft))}
+                      onClick={() => instapay
+                        ? ask.mutate({ kind: 'interest_only', due_date: interestDueDate, note: payNote || undefined, receipt_url: payReceipt || undefined })
+                        : payInterest.mutate(interestDueDate)}
                       className="button-primary flex-1"
                     >
                       {(instapay ? ask.isPending : payInterest.isPending) ? 'Sending…' : `Pay interest · ${fmt(interestLeft)}`}
