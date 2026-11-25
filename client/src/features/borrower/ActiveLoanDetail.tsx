@@ -11,6 +11,7 @@ import type { Loan, LoanScheduleItem } from '@lendflow/shared'
 import { quoteAdvance, quoteAsOfToday } from '@lendflow/shared'
 import { loanTitle } from '@/lib/loan-label'
 import { CheckCircle, Clock, AlertCircle, XCircle } from 'lucide-react'
+import { Modal } from '@/components/shared/Modal'
 
 const CANCEL_REASONS = [
   'No longer need the funds',
@@ -317,113 +318,103 @@ export function ActiveLoanDetail() {
                     </p>
                   )}
                 </div>
-                {showExtend && (
-                  <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#1B2233]/40 p-4 sm:items-center" role="presentation" onClick={() => setShowExtend(false)}>
-                    <div role="dialog" aria-modal="true" aria-labelledby="extend-title" className="w-full max-w-sm border border-border bg-card p-6" onClick={event => event.stopPropagation()}>
-                      <h2 id="extend-title" className="font-serif text-[27px] leading-tight tracking-tight">Request an extension</h2>
-                      <p className="mt-2 text-[13.5px] text-muted-foreground">
-                        The principal stays. Extra days add interest, and your lender confirms the new date.
-                        {last ? ` The current full payment is due ${formatDate(last.due_date)}.` : ''}
-                      </p>
-                      <label className="caps mt-6 block" htmlFor="extend-date">New due date</label>
-                      <input
-                        id="extend-date"
-                        type="date"
-                        value={extendDate}
-                        min={last?.due_date}
-                        onChange={e => setExtendDate(e.target.value)}
-                        className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm"
-                      />
-                      {extraDays > 0 && (
-                        <p className="mt-3 text-sm">{extraDays} more days adds {fmt(extra)} of interest.</p>
-                      )}
-                      <div className="mt-6 flex items-center gap-4">
-                        <button type="button" onClick={() => setShowExtend(false)} className="min-h-12 px-1.5 text-sm font-semibold">Cancel</button>
-                        <button
-                          type="button"
-                          disabled={ask.isPending || extraDays <= 0}
-                          onClick={() => ask.mutate({ kind: 'extension', due_date: extendDate })}
-                          className="button-primary flex-1"
-                        >
-                          {ask.isPending ? 'Sending…' : 'Request extension'}
-                        </button>
-                      </div>
-                    </div>
+                <Modal open={showExtend} onClose={() => setShowExtend(false)} labelledBy="extend-title">
+                  <h2 id="extend-title" className="font-serif text-[27px] leading-tight tracking-tight">Request an extension</h2>
+                  <p className="mt-2 text-[13.5px] text-muted-foreground">
+                    The principal stays. Extra days add interest, and your lender confirms the new date.
+                    {last ? ` The current full payment is due ${formatDate(last.due_date)}.` : ''}
+                  </p>
+                  <label className="caps mt-6 block" htmlFor="extend-date">New due date</label>
+                  <input
+                    id="extend-date"
+                    type="date"
+                    value={extendDate}
+                    min={last?.due_date}
+                    onChange={e => setExtendDate(e.target.value)}
+                    className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm"
+                  />
+                  {extraDays > 0 && (
+                    <p className="mt-3 text-sm">{extraDays} more days adds {fmt(extra)} of interest.</p>
+                  )}
+                  <div className="mt-6 flex items-center gap-4">
+                    <button type="button" onClick={() => setShowExtend(false)} className="min-h-12 px-1.5 text-sm font-semibold">Cancel</button>
+                    <button
+                      type="button"
+                      disabled={ask.isPending || extraDays <= 0}
+                      onClick={() => ask.mutate({ kind: 'extension', due_date: extendDate })}
+                      className="button-primary flex-1"
+                    >
+                      {ask.isPending ? 'Sending…' : 'Request extension'}
+                    </button>
                   </div>
-                )}
-                {showPayFull && fullAmount > 0 && (
-                  <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#1B2233]/40 p-4 sm:items-center" role="presentation" onClick={() => setShowPayFull(false)}>
-                    <div role="dialog" aria-modal="true" aria-labelledby="pay-full-title" className="w-full max-w-sm border border-border bg-card p-6" onClick={event => event.stopPropagation()}>
-                      <h2 id="pay-full-title" className="font-serif text-[27px] leading-tight tracking-tight">Pay now</h2>
-                      <p className="caps mt-6">Payment if today</p>
-                      <p className="num mt-2 text-[44px] leading-none">{fmt(fullAmount)}</p>
-                      <dl className="mt-5 grid grid-cols-2 gap-4 border-t border-border pt-4">
-                        <div>
-                          <dt className="text-xs text-muted-foreground">Principal</dt>
-                          <dd className="num mt-1 text-xl">{fmt(principalLeft)}</dd>
-                        </div>
-                        <div>
-                          <dt className="text-xs text-muted-foreground">Interest</dt>
-                          <dd className="num mt-1 text-xl">{fmt(interestLeft)}</dd>
-                        </div>
-                      </dl>
-                      <p className="mt-3 text-[13.5px] text-muted-foreground">
-                        This closes the loan at the amount calculated through today.
-                        {instapay ? ' Your lender records it when the money arrives.' : ''}
-                      </p>
-                      <div className="mt-6 flex items-center gap-4">
-                        <button type="button" onClick={() => setShowPayFull(false)} className="min-h-12 px-1.5 text-sm font-semibold">Cancel</button>
-                        <button
-                          type="button"
-                          disabled={instapay ? ask.isPending : payFull.isPending || (!instapay && (walletData?.available_balance ?? 0) < fullAmount)}
-                          onClick={() => instapay ? ask.mutate({ kind: 'pay_in_full' }) : payFull.mutate()}
-                          className="button-primary flex-1"
-                        >
-                          {(instapay ? ask.isPending : payFull.isPending) ? 'Sending…' : `Pay now · ${fmt(fullAmount)}`}
-                        </button>
-                      </div>
+                </Modal>
+                <Modal open={showPayFull && fullAmount > 0} onClose={() => setShowPayFull(false)} labelledBy="pay-full-title">
+                  <h2 id="pay-full-title" className="font-serif text-[27px] leading-tight tracking-tight">Pay now</h2>
+                  <p className="caps mt-6">Payment if today</p>
+                  <p className="num mt-2 text-[44px] leading-none">{fmt(fullAmount)}</p>
+                  <dl className="mt-5 grid grid-cols-2 gap-4 border-t border-border pt-4">
+                    <div>
+                      <dt className="text-xs text-muted-foreground">Principal</dt>
+                      <dd className="num mt-1 text-xl">{fmt(principalLeft)}</dd>
                     </div>
+                    <div>
+                      <dt className="text-xs text-muted-foreground">Interest</dt>
+                      <dd className="num mt-1 text-xl">{fmt(interestLeft)}</dd>
+                    </div>
+                  </dl>
+                  <p className="mt-3 text-[13.5px] text-muted-foreground">
+                    This closes the loan at the amount calculated through today.
+                    {instapay ? ' Your lender records it when the money arrives.' : ''}
+                  </p>
+                  <div className="mt-6 flex items-center gap-4">
+                    <button type="button" onClick={() => setShowPayFull(false)} className="min-h-12 px-1.5 text-sm font-semibold">Cancel</button>
+                    <button
+                      type="button"
+                      disabled={instapay ? ask.isPending : payFull.isPending || (!instapay && (walletData?.available_balance ?? 0) < fullAmount)}
+                      onClick={() => instapay ? ask.mutate({ kind: 'pay_in_full' }) : payFull.mutate()}
+                      className="button-primary flex-1"
+                    >
+                      {(instapay ? ask.isPending : payFull.isPending) ? 'Sending…' : `Pay now · ${fmt(fullAmount)}`}
+                    </button>
                   </div>
-                )}
-                {showPay && interestLeft > 0 && (() => {
+                </Modal>
+                {(() => {
                   const rollDays = interestDueDate && last
                     ? Math.round((Date.parse(`${interestDueDate}T00:00:00Z`) - Date.parse(`${last.due_date}T00:00:00Z`)) / 86400000)
                     : 0
                   return (
-                  <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#1B2233]/40 p-4 sm:items-center" role="presentation" onClick={() => setShowPay(false)}>
-                    <div role="dialog" aria-modal="true" aria-labelledby="pay-now-title" className="w-full max-w-sm border border-border bg-card p-6" onClick={event => event.stopPropagation()}>
-                      <h2 id="pay-now-title" className="font-serif text-[27px] leading-tight tracking-tight">Pay interest</h2>
-                      <p className="mt-2 text-[13.5px] text-muted-foreground">
-                        Pays the interest through today and moves the principal of {fmt(principalLeft)} to a later due date.
-                        {instapay ? ' Your lender records it when the money arrives.' : ''}
-                      </p>
-                      <p className="caps mt-6">Interest</p>
-                      <p className="num mt-2 text-[44px] leading-none">{fmt(interestLeft)}</p>
-                      <label className="caps mt-6 block" htmlFor="interest-due-date">New due date</label>
-                      <input
-                        id="interest-due-date"
-                        type="date"
-                        value={interestDueDate}
-                        min={last?.due_date}
-                        onChange={e => setInterestDueDate(e.target.value)}
-                        className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm"
-                      />
-                      {rollDays > 0 && (
-                        <p className="mt-3 text-sm">Principal moves {rollDays} days, to {formatDate(interestDueDate)}.</p>
-                      )}
-                      <div className="mt-6 flex items-center gap-4">
-                        <button type="button" onClick={() => { setShowPay(false); setInterestDueDate('') }} className="min-h-12 px-1.5 text-sm font-semibold">Cancel</button>
-                        <button
-                          type="button"
-                          disabled={rollDays <= 0 || (instapay ? ask.isPending : payInterest.isPending || (!instapay && (walletData?.available_balance ?? 0) < interestLeft))}
-                          onClick={() => instapay ? ask.mutate({ kind: 'interest_only', due_date: interestDueDate }) : payInterest.mutate(interestDueDate)}
-                          className="button-primary flex-1"
-                        >
-                          {(instapay ? ask.isPending : payInterest.isPending) ? 'Sending…' : `Pay interest · ${fmt(interestLeft)}`}
-                        </button>
-                      </div>
-                    </div>
+                <Modal open={showPay && interestLeft > 0} onClose={() => { setShowPay(false); setInterestDueDate('') }} labelledBy="pay-now-title">
+                  <h2 id="pay-now-title" className="font-serif text-[27px] leading-tight tracking-tight">Pay interest</h2>
+                  <p className="mt-2 text-[13.5px] text-muted-foreground">
+                    Pays the interest through today and moves the principal of {fmt(principalLeft)} to a later due date.
+                    {instapay ? ' Your lender records it when the money arrives.' : ''}
+                  </p>
+                  <p className="caps mt-6">Interest</p>
+                  <p className="num mt-2 text-[44px] leading-none">{fmt(interestLeft)}</p>
+                  <label className="caps mt-6 block" htmlFor="interest-due-date">New due date</label>
+                  <input
+                    id="interest-due-date"
+                    type="date"
+                    value={interestDueDate}
+                    min={last?.due_date}
+                    onChange={e => setInterestDueDate(e.target.value)}
+                    className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm"
+                  />
+                  {rollDays > 0 && (
+                    <p className="mt-3 text-sm">Principal moves {rollDays} days, to {formatDate(interestDueDate)}.</p>
+                  )}
+                  <div className="mt-6 flex items-center gap-4">
+                    <button type="button" onClick={() => { setShowPay(false); setInterestDueDate('') }} className="min-h-12 px-1.5 text-sm font-semibold">Cancel</button>
+                    <button
+                      type="button"
+                      disabled={rollDays <= 0 || (instapay ? ask.isPending : payInterest.isPending || (!instapay && (walletData?.available_balance ?? 0) < interestLeft))}
+                      onClick={() => instapay ? ask.mutate({ kind: 'interest_only', due_date: interestDueDate }) : payInterest.mutate(interestDueDate)}
+                      className="button-primary flex-1"
+                    >
+                      {(instapay ? ask.isPending : payInterest.isPending) ? 'Sending…' : `Pay interest · ${fmt(interestLeft)}`}
+                    </button>
                   </div>
+                </Modal>
                   )
                 })()}
               </>
