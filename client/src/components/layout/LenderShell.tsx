@@ -61,7 +61,13 @@ export function LenderShell() {
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header */}
         <header className="sticky top-0 z-30 grid grid-cols-[44px_1fr_44px] items-center bg-background px-3.5 pt-[env(safe-area-inset-top)]">
-          <span />
+          <button
+            onClick={async () => { await signOut(); navigate('/login') }}
+            aria-label="Sign out"
+            className="flex h-11 w-11 items-center justify-center text-foreground md:hidden"
+          >
+            <LogOut className="h-5 w-5" strokeWidth={1.4} />
+          </button>
           <p className="brand-caps text-center text-foreground">{screen}</p>
           <div className="flex justify-end">
             <NotificationBell />
