@@ -10,6 +10,7 @@ import { LOAN_PURPOSE_LABELS } from '@lendflow/shared'
 import type { FundingCommitment } from '@lendflow/shared'
 import { TrendingUp } from 'lucide-react'
 import { LenderCollections } from '@/features/lender/LenderCollections'
+import { BorrowerRequests } from '@/features/lender/BorrowerRequests'
 
 interface CommitmentWithLoan extends FundingCommitment {
   loans: DashboardLoan
@@ -167,6 +168,7 @@ export function LoanBook() {
 
   return (
     <div className="mx-auto max-w-6xl">
+      <BorrowerRequests />
       <LenderCollections commitments={activeAll} figuresOnly />
       <div className="px-6 pb-4 pt-2">
         <label className="caps text-muted-foreground" htmlFor="loan-search">Search loans</label>

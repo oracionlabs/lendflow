@@ -12,6 +12,7 @@ import { QrImage } from '@/components/shared/QrImage'
 import type { LoanScheduleItem } from '@lendflow/shared'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { expectedFullPayment, PaidInFullDialog } from './PaidInFullDialog'
+import { BorrowerRequests } from './BorrowerRequests'
 
 const CANCEL_REASONS = [
   'Borrower requested cancellation',
@@ -198,6 +199,7 @@ export function CommitmentDetail() {
       <Link to="/lender" className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
         <ArrowLeft className="h-4 w-4" /> Portfolio
       </Link>
+      <BorrowerRequests loanId={loan.id} />
 
       {/* Header card */}
       <div className="card-base p-4 md:p-6 space-y-4">

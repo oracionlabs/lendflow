@@ -47,7 +47,103 @@ router.get('/:loanId/payments', async (req: Request, res: Response): Promise<voi
 
 router.post('/:loanId/payments', async (req: Request, res: Response): Promise<void> => {
   const user = res.locals.user
-  const { schedule_id, amount, advance } = req.body as { schedule_id: string; amount: number; advance?: boolean }
+  const { schedule_id, amount, advance, interest_only } = req.body as {
+    schedule_id: string
+    amount: number
+    advance?: boolean
+    interest_only?: boolean
+  }
+
+  if (interest_only) {
+    const db = supabaseAdmin()
+    const { data: loan } = await db
+      .from('loans')
+      .select('borrower_id, status, payment_channel')
+      .eq('id', req.params.loanId)
+      .single()
+    if (!loan || loan.borrower_id !== user.id) { res.status(404).json({ error: 'Loan not found' }); return }
+    if (!['active', 'repaying'].includes(loan.status)) {
+      res.status(400).json({ error: 'Loan is not in a payable state' }); return
+    }
+    if (loan.payment_channel === 'instapay') {
+      res.status(400).json({ error: 'Ask your lender to record an interest-only payment' }); return
+    }
+    const { data: schedule } = await db
+      .from('loan_schedule')
+      .select('*')
+      .eq('loan_id', req.params.loanId)
+      .order('installment_number', { ascending: true })
+    const open = (schedule ?? []).filter(row => !['paid', 'waived'].includes(row.status))
+    const interestLeft = open.reduce((sum, row) => sum + Math.max(0, row.interest_due - (row.interest_paid ?? 0)), 0)
+    if (interestLeft <= 0) { res.status(400).json({ error: 'No interest is left on this loan' }); return }
+    const { data: wallet } = await db.from('wallets').select('id, available_balance').eq('user_id', user.id).single()
+    if (!wallet || wallet.available_balance < interestLeft) {
+      res.status(400).json({ error: 'Insufficient wallet balance' }); return
+    }
+    const { error: debitError } = await db.from('wallets').update({
+      available_balance: wallet.available_balance - interestLeft,
+    }).eq('id', wallet.id)
+    if (debitError) { res.status(500).json({ error: debitError.message }); return }
+    await db.from('transactions').insert({
+      user_id: user.id,
+      wallet_id: wallet.id,
+      type: 'repayment',
+      amount: -interestLeft,
+      balance_after: wallet.available_balance - interestLeft,
+      related_loan_id: req.params.loanId,
+      description: 'Interest-only payment',
+    })
+    const { data: commits } = await db
+      .from('funding_commitments')
+      .select('id, lender_id, share_percent, actual_yield')
+      .eq('loan_id', req.params.loanId)
+    for (const row of open) {
+      const interestOwed = Math.max(0, row.interest_due - (row.interest_paid ?? 0))
+      if (interestOwed <= 0) continue
+      const totalPaid = (row.total_paid ?? 0) + interestOwed
+      await db.from('loan_schedule').update({
+        status: totalPaid >= row.total_due ? 'paid' : 'partial',
+        interest_paid: (row.interest_paid ?? 0) + interestOwed,
+        total_paid: totalPaid,
+        paid_at: new Date().toISOString(),
+        payment_note: 'Interest only',
+      }).eq('id', row.id)
+    }
+    for (const commit of commits ?? []) {
+      const share = Math.round(interestLeft * Number(commit.share_percent ?? 100) / 100)
+      const { data: lenderWallet } = await db.from('wallets').select('id, available_balance, total_yield_earned').eq('user_id', commit.lender_id).single()
+      if (lenderWallet) {
+        await db.from('wallets').update({
+          available_balance: lenderWallet.available_balance + share,
+          total_yield_earned: (lenderWallet.total_yield_earned ?? 0) + share,
+        }).eq('id', lenderWallet.id)
+        await db.from('transactions').insert({
+          user_id: commit.lender_id,
+          wallet_id: lenderWallet.id,
+          type: 'yield_distribution',
+          amount: share,
+          balance_after: lenderWallet.available_balance + share,
+          related_loan_id: req.params.loanId,
+          related_commitment_id: commit.id,
+          description: 'Interest-only payment',
+        })
+      }
+      await db.from('funding_commitments').update({
+        actual_yield: (commit.actual_yield ?? 0) + share,
+        status: 'repaying',
+      }).eq('id', commit.id)
+      await db.from('yield_distributions').insert({
+        commitment_id: commit.id,
+        schedule_id: open[0]?.id,
+        principal_return: 0,
+        interest_return: share,
+        total_return: share,
+      })
+    }
+    await db.from('loans').update({ status: 'repaying' }).eq('id', req.params.loanId)
+    res.json({ total_paid: interestLeft, interest_only: true })
+    return
+  }
 
   if (!schedule_id || !amount || amount <= 0) {
     res.status(400).json({ error: 'schedule_id and positive amount are required' })

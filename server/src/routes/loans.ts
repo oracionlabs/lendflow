@@ -4,6 +4,7 @@ import { requireBorrower } from '../middleware/requireRole'
 import { assessCredit } from '../lib/credit-assessment'
 import { previewMonthlyPayment } from '../lib/amortization'
 import { quoteAdvance } from '@lendflow/shared'
+import { createNotification } from '../lib/notifications'
 import { CREDIT_GRADE_RATES } from '@lendflow/shared'
 import type { User } from '@lendflow/shared'
 
@@ -432,6 +433,118 @@ router.get('/:id/yield-preview', async (req: Request, res: Response): Promise<vo
     projected_total_yield: totalYield,
     projected_monthly_yield: monthlyYield,
   })
+})
+
+router.get('/:id/requests', requireBorrower, async (req: Request, res: Response): Promise<void> => {
+  const user = res.locals.user
+  const db = supabaseAdmin()
+  const { data: loan } = await db.from('loans').select('borrower_id').eq('id', req.params.id).maybeSingle()
+  if (!loan || loan.borrower_id !== user.id) { res.status(404).json({ error: 'Loan not found' }); return }
+  const { data, error } = await db
+    .from('borrower_requests')
+    .select('id, kind, requested_due_date, amount, status, created_at')
+    .eq('loan_id', req.params.id)
+    .order('created_at', { ascending: false })
+  if (error) { res.status(500).json({ error: error.message }); return }
+  res.json({ requests: data ?? [] })
+})
+
+router.post('/:id/requests', requireBorrower, async (req: Request, res: Response): Promise<void> => {
+  const user = res.locals.user
+  const { kind, due_date } = req.body as { kind?: 'extension' | 'interest_only'; due_date?: string }
+  if (kind !== 'extension' && kind !== 'interest_only') {
+    res.status(400).json({ error: 'Choose an extension or an interest-only payment' })
+    return
+  }
+  if (kind === 'extension' && (!due_date || !/^\d{4}-\d{2}-\d{2}$/.test(due_date))) {
+    res.status(400).json({ error: 'Choose a new due date' })
+    return
+  }
+
+  const db = supabaseAdmin()
+  const { data: loan } = await db
+    .from('loans')
+    .select('id, borrower_id, status, interest_rate, payment_channel')
+    .eq('id', req.params.id)
+    .maybeSingle()
+  if (!loan || loan.borrower_id !== user.id) { res.status(404).json({ error: 'Loan not found' }); return }
+  if (!['active', 'repaying'].includes(loan.status)) {
+    res.status(400).json({ error: 'This loan is not open' })
+    return
+  }
+  if (loan.payment_channel !== 'instapay') {
+    res.status(400).json({ error: 'Use the payment buttons on this loan' })
+    return
+  }
+
+  const { data: schedule } = await db
+    .from('loan_schedule')
+    .select('due_date, principal_due, principal_paid, interest_due, interest_paid, total_due, total_paid, status')
+    .eq('loan_id', loan.id)
+    .order('installment_number', { ascending: true })
+  const open = (schedule ?? []).filter(row => !['paid', 'waived'].includes(row.status))
+  if (!open.length) { res.status(400).json({ error: 'This loan is already paid' }); return }
+
+  const interestLeft = open.reduce((sum, row) => sum + Math.max(0, row.interest_due - (row.interest_paid ?? 0)), 0)
+  let amount = interestLeft
+  let requestedDue = due_date ?? null
+  if (kind === 'extension') {
+    const last = open[open.length - 1]
+    const extraDays = Math.round((Date.parse(`${due_date}T00:00:00Z`) - Date.parse(`${last.due_date}T00:00:00Z`)) / 86400000)
+    if (extraDays <= 0) {
+      res.status(400).json({ error: 'The new due date has to be after the current full-payment date' })
+      return
+    }
+    const principal = open.reduce((sum, row) => sum + Math.max(0, row.principal_due - (row.principal_paid ?? 0)), 0)
+    amount = Math.round(principal * Number(loan.interest_rate) * extraDays / 365)
+    requestedDue = due_date ?? null
+  } else if (interestLeft <= 0) {
+    res.status(400).json({ error: 'No interest is left on this loan' })
+    return
+  }
+
+  const { data: existing } = await db
+    .from('borrower_requests')
+    .select('id')
+    .eq('loan_id', loan.id)
+    .eq('kind', kind)
+    .eq('status', 'pending')
+    .maybeSingle()
+
+  const saved = existing
+    ? await db.from('borrower_requests').update({
+        requested_due_date: requestedDue,
+        amount,
+      }).eq('id', existing.id).select('id, kind, requested_due_date, amount, status, created_at').single()
+    : await db.from('borrower_requests').insert({
+        loan_id: loan.id,
+        borrower_id: user.id,
+        kind,
+        requested_due_date: requestedDue,
+        amount,
+      }).select('id, kind, requested_due_date, amount, status, created_at').single()
+
+  if (saved.error) { res.status(500).json({ error: saved.error.message }); return }
+
+  const { data: commitment } = await db
+    .from('funding_commitments')
+    .select('id, lender_id')
+    .eq('loan_id', loan.id)
+    .limit(1)
+    .maybeSingle()
+  if (commitment && !existing) {
+    await createNotification({
+      user_id: commitment.lender_id,
+      type: 'system',
+      title: kind === 'extension' ? 'Extension requested' : 'Interest-only payment',
+      body: kind === 'extension'
+        ? 'A borrower asked to move a due date.'
+        : 'A borrower asked you to record an interest-only payment.',
+      link: `/lender/commitments/${commitment.id}`,
+    }).catch(() => undefined)
+  }
+
+  res.status(existing ? 200 : 201).json({ request: saved.data })
 })
 
 export default router

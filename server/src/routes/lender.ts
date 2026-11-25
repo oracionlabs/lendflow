@@ -3,6 +3,7 @@ import { supabaseAdmin } from '../lib/supabase'
 import { assessCredit } from '../lib/credit-assessment'
 import { ensureLoanAccess } from '../lib/loan-access'
 import { partialAdvanceSavings, quoteAdvance } from '@lendflow/shared'
+import { createNotification } from '../lib/notifications'
 
 function reduceScheduleInterest(
   rows: Array<{ interest_due: number; interest_paid?: number | null; total_due: number }>,
@@ -615,7 +616,7 @@ router.post('/loans/:loanId/instapay-payment', async (req: Request, res: Respons
   const { schedule_id, amount, mode, received_date, method, note: paymentNote } = req.body as {
     schedule_id?: string
     amount?: number
-    mode?: 'partial' | 'full' | 'installment' | 'advance'
+    mode?: 'partial' | 'full' | 'installment' | 'advance' | 'interest'
     received_date?: string
     method?: string
     note?: string
@@ -675,6 +676,11 @@ router.post('/loans/:loanId/instapay-payment', async (req: Request, res: Respons
   }
 
   const payMode = mode ?? (schedule_id ? 'installment' : 'partial')
+  const interestLeft = targets.reduce((sum, row) => sum + Math.max(0, row.interest_due - (row.interest_paid ?? 0)), 0)
+  if (payMode === 'interest' && interestLeft <= 0) {
+    res.status(400).json({ error: 'No interest is left on this loan' })
+    return
+  }
   let interestSaved = 0
   let advanceInterestRoom = Number.POSITIVE_INFINITY
   if (payMode === 'advance') {
@@ -715,7 +721,9 @@ router.post('/loans/:loanId/instapay-payment', async (req: Request, res: Respons
 
   const payRows = payMode === 'advance' ? open : targets
   const outstandingNow = payRows.reduce((sum, row) => sum + (row.total_due - (row.total_paid ?? 0)), 0)
-  const payAmount = payMode === 'partial' || (payMode === 'advance' && amount != null)
+  const payAmount = payMode === 'interest'
+    ? interestLeft
+    : payMode === 'partial' || (payMode === 'advance' && amount != null)
     ? Math.round(amount ?? 0)
     : payMode === 'advance'
       ? outstandingNow
@@ -735,7 +743,7 @@ router.post('/loans/:loanId/instapay-payment', async (req: Request, res: Respons
     typeof method === 'string' ? method.trim().slice(0, 40) : '',
     typeof paymentNote === 'string' ? paymentNote.trim().slice(0, 200) : '',
   ].filter(Boolean).join(' · ')
-  const note = detail || (payMode === 'full' ? 'Paid in full' : payMode === 'advance' ? 'Advance' : 'Partial')
+  const note = detail || (payMode === 'full' ? 'Paid in full' : payMode === 'advance' ? 'Advance' : payMode === 'interest' ? 'Interest only' : 'Partial')
 
   for (const row of payRows) {
     if (left <= 0) break
@@ -745,7 +753,9 @@ router.post('/loans/:loanId/instapay-payment', async (req: Request, res: Respons
     const interestPortion = payMode === 'advance'
       ? Math.min(interestOwed, left, advanceInterestRoom)
       : Math.min(interestOwed, left, owed)
-    const principalPortion = payMode === 'advance'
+    const principalPortion = payMode === 'interest'
+      ? 0
+      : payMode === 'advance'
       ? Math.min(principalRoom, left - interestPortion)
       : Math.min(left, owed) - interestPortion
     const apply = interestPortion + principalPortion
@@ -913,6 +923,226 @@ router.post('/commitments/:id/cancel', async (req: Request, res: Response): Prom
   await db.from('funding_commitments').update({ status: 'completed' }).eq('id', req.params.id)
 
   res.json({ success: true })
+})
+
+router.get('/borrower-requests', async (req: Request, res: Response): Promise<void> => {
+  const lender = res.locals.user
+  const db = supabaseAdmin()
+  const { data: commitments, error } = await db
+    .from('funding_commitments')
+    .select('id, loan_id')
+    .eq('lender_id', lender.id)
+  if (error) { res.status(500).json({ error: error.message }); return }
+  const loanIds = (commitments ?? []).map(row => row.loan_id)
+  if (!loanIds.length) { res.json({ requests: [] }); return }
+
+  const { data: requests, error: requestError } = await db
+    .from('borrower_requests')
+    .select('id, loan_id, kind, requested_due_date, amount, created_at, loans(purpose, product_name, loan_kind, currency, users!borrower_id(name))')
+    .in('loan_id', loanIds)
+    .eq('status', 'pending')
+    .order('created_at', { ascending: true })
+  if (requestError) { res.status(500).json({ error: requestError.message }); return }
+
+  const commitmentByLoan = new Map((commitments ?? []).map(row => [row.loan_id, row.id]))
+  const list = (requests ?? []) as unknown as Array<{
+    id: string
+    loan_id: string
+    kind: string
+    requested_due_date: string | null
+    amount: number | null
+    created_at: string
+    loans: {
+      purpose?: string
+      product_name?: string | null
+      loan_kind?: string
+      currency?: string
+      users?: { name?: string } | Array<{ name?: string }> | null
+    } | Array<{
+      purpose?: string
+      product_name?: string | null
+      loan_kind?: string
+      currency?: string
+      users?: { name?: string } | Array<{ name?: string }> | null
+    }> | null
+  }>
+  res.json({
+    requests: list.map(row => {
+      const loan = Array.isArray(row.loans) ? row.loans[0] : row.loans
+      const person = loan?.users
+      const name = Array.isArray(person) ? person[0]?.name : person?.name
+      return {
+        id: row.id,
+        loan_id: row.loan_id,
+        commitment_id: commitmentByLoan.get(row.loan_id) ?? null,
+        kind: row.kind,
+        requested_due_date: row.requested_due_date,
+        amount: row.amount,
+        created_at: row.created_at,
+        currency: loan?.currency,
+        borrower_name: name ?? 'Borrower',
+        title: loan?.loan_kind === 'product' && loan.product_name ? loan.product_name : loan?.purpose,
+      }
+    }),
+  })
+})
+
+router.post('/borrower-requests/:id/decide', async (req: Request, res: Response): Promise<void> => {
+  const lender = res.locals.user
+  const { decision } = req.body as { decision?: 'accept' | 'decline' }
+  if (decision !== 'accept' && decision !== 'decline') {
+    res.status(400).json({ error: 'Choose accept or decline' })
+    return
+  }
+
+  const db = supabaseAdmin()
+  const { data: request } = await db
+    .from('borrower_requests')
+    .select('id, loan_id, borrower_id, kind, requested_due_date, status')
+    .eq('id', req.params.id)
+    .maybeSingle()
+  if (!request || request.status !== 'pending') {
+    res.status(404).json({ error: 'That request is no longer waiting' })
+    return
+  }
+
+  const { data: commitment } = await db
+    .from('funding_commitments')
+    .select('id, actual_yield, expected_yield, loans!inner(interest_rate, payment_channel, status, total_repayment)')
+    .eq('lender_id', lender.id)
+    .eq('loan_id', request.loan_id)
+    .limit(1)
+    .maybeSingle()
+  if (!commitment) { res.status(404).json({ error: 'Loan not found' }); return }
+  const loanJoin = commitment.loans as {
+    interest_rate: number
+    payment_channel?: string
+    status: string
+    total_repayment: number
+  } | Array<{
+    interest_rate: number
+    payment_channel?: string
+    status: string
+    total_repayment: number
+  }>
+  const loan = Array.isArray(loanJoin) ? loanJoin[0] : loanJoin
+
+  if (decision === 'decline') {
+    await db.from('borrower_requests').update({
+      status: 'declined',
+      resolved_at: new Date().toISOString(),
+    }).eq('id', request.id)
+    await createNotification({
+      user_id: request.borrower_id,
+      type: 'system',
+      title: request.kind === 'extension' ? 'Extension declined' : 'Interest payment declined',
+      body: 'Your lender did not accept this request.',
+      link: `/borrower/loans/${request.loan_id}`,
+    }).catch(() => undefined)
+    res.json({ success: true, status: 'declined' })
+    return
+  }
+
+  if (!loan || loan.payment_channel !== 'instapay') {
+    res.status(400).json({ error: 'This loan is paid through the app wallet' })
+    return
+  }
+  if (['completed', 'cancelled', 'rejected'].includes(loan.status)) {
+    res.status(400).json({ error: 'This loan is already closed' })
+    return
+  }
+
+  const { data: schedule, error: scheduleError } = await db
+    .from('loan_schedule')
+    .select('*')
+    .eq('loan_id', request.loan_id)
+    .order('installment_number', { ascending: true })
+  if (scheduleError) { res.status(500).json({ error: scheduleError.message }); return }
+  const open = (schedule ?? []).filter(row => !['paid', 'waived'].includes(row.status))
+  if (!open.length) { res.status(400).json({ error: 'This loan is already paid' }); return }
+
+  if (request.kind === 'extension') {
+    const due = request.requested_due_date
+    if (!due) { res.status(400).json({ error: 'This request has no date' }); return }
+    const last = open[open.length - 1]
+    const extraDays = Math.round((Date.parse(`${due}T00:00:00`) - Date.parse(`${last.due_date}T00:00:00`)) / 86400000)
+    if (extraDays <= 0) {
+      res.status(400).json({ error: 'The requested date is no longer after the current due date' })
+      return
+    }
+    const remainingPrincipal = open.reduce((sum, row) => sum + Math.max(0, row.principal_due - (row.principal_paid ?? 0)), 0)
+    const extraInterest = Math.round(remainingPrincipal * Number(loan.interest_rate) * extraDays / 365)
+    for (const row of open) {
+      const shifted = new Date(`${row.due_date}T00:00:00`)
+      shifted.setDate(shifted.getDate() + extraDays)
+      const nextDue = shifted.toISOString().split('T')[0]
+      const isLast = row.id === last.id
+      const { error } = await db.from('loan_schedule').update({
+        due_date: nextDue,
+        interest_due: row.interest_due + (isLast ? extraInterest : 0),
+        total_due: row.total_due + (isLast ? extraInterest : 0),
+      }).eq('id', row.id)
+      if (error) { res.status(500).json({ error: error.message }); return }
+    }
+    const maturityDate = new Date(`${last.due_date}T00:00:00`)
+    maturityDate.setDate(maturityDate.getDate() + extraDays)
+    await db.from('loans').update({
+      total_repayment: (loan.total_repayment ?? 0) + extraInterest,
+      maturity_date: maturityDate.toISOString().split('T')[0],
+    }).eq('id', request.loan_id)
+    await db.from('funding_commitments').update({
+      expected_yield: (commitment.expected_yield ?? 0) + extraInterest,
+    }).eq('id', commitment.id)
+  } else {
+    const now = new Date().toISOString()
+    let interestRecorded = 0
+    for (const row of open) {
+      const interestOwed = Math.max(0, row.interest_due - (row.interest_paid ?? 0))
+      if (interestOwed <= 0) continue
+      const totalPaid = (row.total_paid ?? 0) + interestOwed
+      const settled = totalPaid >= row.total_due
+      const { error } = await db.from('loan_schedule').update({
+        status: settled ? 'paid' : 'partial',
+        interest_paid: (row.interest_paid ?? 0) + interestOwed,
+        total_paid: totalPaid,
+        paid_at: now,
+        payment_note: 'Interest only',
+      }).eq('id', row.id)
+      if (error) { res.status(500).json({ error: error.message }); return }
+      await db.from('yield_distributions').insert({
+        commitment_id: commitment.id,
+        schedule_id: row.id,
+        principal_return: 0,
+        interest_return: interestOwed,
+        total_return: interestOwed,
+      })
+      interestRecorded += interestOwed
+    }
+    if (interestRecorded <= 0) {
+      res.status(400).json({ error: 'No interest is left on this loan' })
+      return
+    }
+    await db.from('funding_commitments').update({
+      actual_yield: (commitment.actual_yield ?? 0) + interestRecorded,
+      status: 'repaying',
+    }).eq('id', commitment.id)
+    await db.from('loans').update({ status: 'repaying' }).eq('id', request.loan_id)
+  }
+
+  await db.from('borrower_requests').update({
+    status: 'accepted',
+    resolved_at: new Date().toISOString(),
+  }).eq('id', request.id)
+  await createNotification({
+    user_id: request.borrower_id,
+    type: 'system',
+    title: request.kind === 'extension' ? 'Extension accepted' : 'Interest payment recorded',
+    body: request.kind === 'extension'
+      ? 'Your lender moved the due date. The extra interest is on the schedule.'
+      : 'Your lender recorded the interest. The principal is still due.',
+    link: `/borrower/loans/${request.loan_id}`,
+  }).catch(() => undefined)
+  res.json({ success: true, status: 'accepted' })
 })
 
 export default router
