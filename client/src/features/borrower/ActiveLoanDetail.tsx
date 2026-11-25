@@ -20,7 +20,7 @@ const CANCEL_REASONS = [
   'Other',
 ]
 
-const CANCELLABLE = ['draft', 'submitted', 'under_review', 'approved', 'funding', 'fully_funded', 'active', 'repaying']
+const CANCELLABLE = ['draft', 'submitted', 'under_review', 'approved', 'funding', 'fully_funded']
 
 function ScheduleStatusIcon({ status }: { status: string }) {
   if (status === 'paid') return <CheckCircle className="h-4 w-4 text-green-600" />
@@ -39,6 +39,8 @@ export function ActiveLoanDetail() {
   const [cancelReason, setCancelReason] = useState(CANCEL_REASONS[0])
   const [cancelOther, setCancelOther] = useState('')
   const [extendDate, setExtendDate] = useState('')
+  const [showExtend, setShowExtend] = useState(false)
+  const [showPay, setShowPay] = useState(false)
 
   const { data: loanPayload, isLoading: loanLoading } = useQuery({
     queryKey: ['loan', id],
@@ -119,6 +121,8 @@ export function ActiveLoanDetail() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['loan-requests', id] })
       setExtendDate('')
+      setShowExtend(false)
+      setShowPay(false)
       toast.success('Sent to your lender')
     },
     onError: (err: unknown) => {
@@ -131,6 +135,7 @@ export function ActiveLoanDetail() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['loan-schedule', id] })
       qc.invalidateQueries({ queryKey: ['wallet'] })
+      setShowPay(false)
       toast.success('Interest paid. The principal stays on the schedule.')
     },
     onError: (err: unknown) => {
@@ -252,73 +257,94 @@ export function ActiveLoanDetail() {
             const extra = extraDays > 0 ? Math.round(principalLeft * (loan.interest_rate ?? 0) * extraDays / 365) : 0
             const instapay = loan.payment_channel === 'instapay'
             return (
-              <div className="card-base p-5 space-y-5">
-                <div className="space-y-2">
-                  <p className="font-semibold">Request an extension</p>
-                  <p className="text-sm text-muted-foreground">
-                    The principal stays. Extra days add interest, and your lender confirms the new date.
-                    {last ? ` The current full payment is due ${formatDate(last.due_date)}.` : ''}
-                  </p>
-                  {pendingExtension ? (
-                    <p className="text-sm">Waiting for your lender to confirm {pendingExtension.requested_due_date ? formatDate(pendingExtension.requested_due_date) : 'the new date'}.</p>
-                  ) : (
-                    <>
+              <>
+                <div className="card-base p-5 space-y-4">
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    {pendingExtension ? (
+                      <p className="text-sm">Waiting for your lender to confirm {pendingExtension.requested_due_date ? formatDate(pendingExtension.requested_due_date) : 'the new date'}.</p>
+                    ) : (
+                      <button type="button" onClick={() => setShowExtend(true)} className="min-h-11 rounded-lg border px-4 text-sm font-medium">
+                        Request extension
+                      </button>
+                    )}
+                    {interestLeft > 0 && (instapay && pendingInterest ? (
+                      <p className="text-sm">Waiting for your lender to record {fmt(pendingInterest.amount ?? interestLeft)}.</p>
+                    ) : (
+                      <button type="button" onClick={() => setShowPay(true)} className="button-primary px-4">
+                        Pay Now - {fmt(interestLeft)} only
+                      </button>
+                    ))}
+                  </div>
+                  {today && (
+                    <p className="text-sm text-muted-foreground">
+                      If paid today, interest {fmt(today.interest_today)} and the full payment is {fmt(today.payment_today)}.
+                      {today.days_from_due > 0
+                        ? ` ${today.days_from_due} days past ${formatDate(today.due_date)}.`
+                        : today.days_from_due < 0
+                          ? ` That is ${fmt(today.scheduled_payment - today.payment_today)} less than the ${fmt(today.scheduled_payment)} due ${formatDate(today.due_date)}.`
+                          : ' Today is the due date.'}
+                    </p>
+                  )}
+                </div>
+                {showExtend && (
+                  <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#1B2233]/40 p-4 sm:items-center" role="presentation" onClick={() => setShowExtend(false)}>
+                    <div role="dialog" aria-modal="true" aria-labelledby="extend-title" className="w-full max-w-sm border border-border bg-card p-6" onClick={event => event.stopPropagation()}>
+                      <h2 id="extend-title" className="font-serif text-[27px] leading-tight tracking-tight">Request an extension</h2>
+                      <p className="mt-2 text-[13.5px] text-muted-foreground">
+                        The principal stays. Extra days add interest, and your lender confirms the new date.
+                        {last ? ` The current full payment is due ${formatDate(last.due_date)}.` : ''}
+                      </p>
+                      <label className="caps mt-6 block" htmlFor="extend-date">New due date</label>
                       <input
+                        id="extend-date"
                         type="date"
                         value={extendDate}
                         min={last?.due_date}
                         onChange={e => setExtendDate(e.target.value)}
-                        className="min-h-11 w-full border border-border bg-background px-3 text-sm"
+                        className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm"
                       />
                       {extraDays > 0 && (
-                        <p className="text-sm">{extraDays} more days adds {fmt(extra)} of interest.</p>
+                        <p className="mt-3 text-sm">{extraDays} more days adds {fmt(extra)} of interest.</p>
                       )}
-                      <button
-                        type="button"
-                        disabled={ask.isPending || extraDays <= 0}
-                        onClick={() => ask.mutate({ kind: 'extension', due_date: extendDate })}
-                        className="min-h-11 rounded-lg border px-4 text-sm font-medium disabled:opacity-50"
-                      >
-                        {ask.isPending ? 'Sending…' : 'Request extension'}
-                      </button>
-                    </>
-                  )}
-                </div>
-                {interestLeft > 0 && (
-                  <div className="space-y-2 border-t border-border pt-4">
-                    <p className="font-semibold">Pay interest only</p>
-                    <p className="text-sm text-muted-foreground">
-                      Pay the interest calculated through today, {fmt(interestLeft)}. The principal of {fmt(principalLeft)} stays due {formatDate(nextDue.due_date)}.
-                      {instapay ? ' Your lender records it when the money arrives.' : ''}
-                    </p>
-                    {instapay && pendingInterest ? (
-                      <p className="text-sm">Waiting for your lender to record {fmt(pendingInterest.amount ?? interestLeft)}.</p>
-                    ) : (
-                      <button
-                        type="button"
-                        disabled={instapay ? ask.isPending : payInterest.isPending || (walletData?.available_balance ?? 0) < interestLeft}
-                        onClick={() => instapay ? ask.mutate({ kind: 'interest_only' }) : payInterest.mutate()}
-                        className="min-h-11 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-50"
-                      >
-                        {(instapay ? ask.isPending : payInterest.isPending) ? 'Sending…' : `Pay interest only · ${fmt(interestLeft)}`}
-                      </button>
-                    )}
+                      <div className="mt-6 flex items-center gap-4">
+                        <button type="button" onClick={() => setShowExtend(false)} className="min-h-12 px-1.5 text-sm font-semibold">Cancel</button>
+                        <button
+                          type="button"
+                          disabled={ask.isPending || extraDays <= 0}
+                          onClick={() => ask.mutate({ kind: 'extension', due_date: extendDate })}
+                          className="button-primary flex-1"
+                        >
+                          {ask.isPending ? 'Sending…' : 'Request extension'}
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 )}
-                {today && (
-                  <div className="space-y-1 border-t border-border pt-4">
-                    <p className="font-semibold">If paid today, {formatDate(today.as_of)}</p>
-                    <p className="text-sm">Interest {fmt(today.interest_today)} · payment {fmt(today.payment_today)}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {today.days_from_due > 0
-                        ? `${today.days_from_due} days past ${formatDate(today.due_date)} adds ${fmt(today.interest_today - today.scheduled_interest)} to the scheduled ${fmt(today.scheduled_payment)}.`
-                        : today.days_from_due < 0
-                          ? `Paying today removes ${fmt(today.scheduled_payment - today.payment_today)} of interest from the ${fmt(today.scheduled_payment)} due ${formatDate(today.due_date)}.`
-                          : `Today is the due date, so this is the scheduled payment.`}
-                    </p>
+                {showPay && interestLeft > 0 && (
+                  <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#1B2233]/40 p-4 sm:items-center" role="presentation" onClick={() => setShowPay(false)}>
+                    <div role="dialog" aria-modal="true" aria-labelledby="pay-now-title" className="w-full max-w-sm border border-border bg-card p-6" onClick={event => event.stopPropagation()}>
+                      <h2 id="pay-now-title" className="font-serif text-[27px] leading-tight tracking-tight">Pay now</h2>
+                      <p className="caps mt-6">Interest only</p>
+                      <p className="num mt-2 text-[44px] leading-none">{fmt(interestLeft)}</p>
+                      <p className="mt-3 text-[13.5px] text-muted-foreground">
+                        This pays the interest through today. The principal of {fmt(principalLeft)} stays due {formatDate(nextDue.due_date)}.
+                        {instapay ? ' Your lender records it when the money arrives.' : ''}
+                      </p>
+                      <div className="mt-6 flex items-center gap-4">
+                        <button type="button" onClick={() => setShowPay(false)} className="min-h-12 px-1.5 text-sm font-semibold">Cancel</button>
+                        <button
+                          type="button"
+                          disabled={instapay ? ask.isPending : payInterest.isPending || (!instapay && (walletData?.available_balance ?? 0) < interestLeft)}
+                          onClick={() => instapay ? ask.mutate({ kind: 'interest_only' }) : payInterest.mutate()}
+                          className="button-primary flex-1"
+                        >
+                          {(instapay ? ask.isPending : payInterest.isPending) ? 'Sending…' : `Pay Now - ${fmt(interestLeft)} only`}
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 )}
-              </div>
+              </>
             )
           })()}
 
