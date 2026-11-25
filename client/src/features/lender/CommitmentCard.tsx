@@ -20,6 +20,7 @@ interface ScheduleRow {
   principal_paid?: number
   interest_due?: number
   interest_paid?: number
+  paid_at?: string | null
 }
 
 export interface DashboardLoan {

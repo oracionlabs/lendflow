@@ -104,7 +104,7 @@ router.get('/commitments', async (req: Request, res: Response): Promise<void> =>
         amount_requested, approved_amount, monthly_payment, currency,
         loan_kind, product_name, payment_channel,
         users!borrower_id (name),
-        loan_schedule (installment_number, due_date, total_due, total_paid, status, principal_due, principal_paid, interest_due, interest_paid)
+        loan_schedule (installment_number, due_date, total_due, total_paid, status, principal_due, principal_paid, interest_due, interest_paid, paid_at)
       )
     `)
     .eq('lender_id', user.id)
@@ -612,10 +612,13 @@ router.get('/loans/:loanId/access', async (req: Request, res: Response): Promise
 
 router.post('/loans/:loanId/instapay-payment', async (req: Request, res: Response): Promise<void> => {
   const lender = res.locals.user
-  const { schedule_id, amount, mode } = req.body as {
+  const { schedule_id, amount, mode, received_date, method, note: paymentNote } = req.body as {
     schedule_id?: string
     amount?: number
     mode?: 'partial' | 'full' | 'installment' | 'advance'
+    received_date?: string
+    method?: string
+    note?: string
   }
 
   const db = supabaseAdmin()
@@ -725,7 +728,14 @@ router.post('/loans/:loanId/instapay-payment', async (req: Request, res: Respons
   let left = payAmount
   let interestRecorded = 0
   const now = new Date().toISOString()
-  const note = payMode === 'full' ? 'Paid in full' : payMode === 'advance' ? 'Advance' : 'Partial'
+  const receivedAt = typeof received_date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(received_date)
+    ? new Date(`${received_date}T04:00:00Z`).toISOString()
+    : now
+  const detail = [
+    typeof method === 'string' ? method.trim().slice(0, 40) : '',
+    typeof paymentNote === 'string' ? paymentNote.trim().slice(0, 200) : '',
+  ].filter(Boolean).join(' · ')
+  const note = detail || (payMode === 'full' ? 'Paid in full' : payMode === 'advance' ? 'Advance' : 'Partial')
 
   for (const row of payRows) {
     if (left <= 0) break
@@ -748,7 +758,7 @@ router.post('/loans/:loanId/instapay-payment', async (req: Request, res: Respons
       principal_paid: (row.principal_paid ?? 0) + principalPortion,
       interest_paid: (row.interest_paid ?? 0) + interestPortion,
       total_paid: totalPaid,
-      paid_at: now,
+      paid_at: receivedAt,
       payment_note: note,
     }).eq('id', row.id)
     if (payError) { res.status(500).json({ error: payError.message }); return }
