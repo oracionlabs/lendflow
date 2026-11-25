@@ -1,26 +1,42 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import api from '@/lib/api'
-import { formatCents, formatDate, useCurrency } from '@/lib/utils'
+import { formatCents, formatDate, formatPercent, useCurrency } from '@/lib/utils'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { CardSkeleton } from '@/components/shared/LoadingSkeleton'
-import { LOAN_PURPOSE_LABELS } from '@lendflow/shared'
+import { loanBalance, loanTitle, personName } from '@/lib/loan-label'
 import type { Loan } from '@lendflow/shared'
 import { ChevronRight, FileText } from 'lucide-react'
+
+interface BorrowerLoan extends Loan {
+  funding_commitments?: { users?: { name?: string } | { name?: string }[] | null }[]
+  loan_schedule?: { due_date: string; total_due: number; total_paid?: number | null; status: string }[]
+}
 
 const ACTIVE_STATUSES = ['active', 'repaying', 'approved', 'funding', 'fully_funded']
 const PENDING_STATUSES = ['submitted', 'under_review']
 const PAST_STATUSES = ['completed', 'rejected', 'cancelled', 'defaulted']
 
-function LoanCard({ loan }: { loan: Loan }) {
+function LoanCard({ loan }: { loan: BorrowerLoan }) {
+  const currency = loan.currency
+  const lender = personName(loan.funding_commitments?.[0]?.users)
+  const { remaining, paid, nextDue } = loanBalance(loan.loan_schedule)
+  const due = nextDue ?? loan.maturity_date
+  const rate = loan.interest_rate && loan.interest_rate > 0 ? formatPercent(loan.interest_rate) : null
   return (
     <Link to={`/borrower/loans/${loan.id}`}
       className="flex items-center justify-between card-base interactive-card p-4">
       <div className="min-w-0">
-        <p className="font-medium text-sm">{LOAN_PURPOSE_LABELS[loan.purpose] ?? loan.purpose}</p>
+        <p className="font-medium break-words">{loanTitle(loan)}</p>
+        <p className="text-xs text-muted-foreground mt-1">
+          {[lender, loan.loan_kind === 'product' ? 'Product' : 'Cash', rate].filter(Boolean).join(' · ')}
+        </p>
         <p className="text-xs text-muted-foreground mt-0.5">
-          {formatCents(loan.amount_requested)}
-          {loan.first_payment_date ? ` · Due ${formatDate(loan.first_payment_date)}` : ''}
+          {loan.loan_schedule?.length
+            ? `${formatCents(remaining, currency)} left`
+            : formatCents(loan.approved_amount ?? loan.amount_requested, currency)}
+          {due ? ` · due ${formatDate(due)}` : ''}
+          {paid > 0 ? ` · ${formatCents(paid, currency)} paid` : ''}
         </p>
       </div>
       <div className="flex items-center gap-2 flex-shrink-0 ml-3">
@@ -31,7 +47,7 @@ function LoanCard({ loan }: { loan: Loan }) {
   )
 }
 
-function Section({ title, loans }: { title: string; loans: Loan[] }) {
+function Section({ title, loans }: { title: string; loans: BorrowerLoan[] }) {
   if (!loans.length) return null
   return (
     <section>
@@ -48,7 +64,7 @@ export function BorrowerLoans() {
   const { data: loans, isLoading } = useQuery({
     queryKey: ['borrower-loans'],
     queryFn: async () => {
-      const { data } = await api.get<{ loans: Loan[] }>('/api/loans')
+      const { data } = await api.get<{ loans: BorrowerLoan[] }>('/api/loans')
       return data.loans
     },
   })

@@ -43,7 +43,7 @@ router.get('/:token', async (req: Request, res: Response): Promise<void> => {
   const { data: loans, error } = await db
     .from('loans')
     .select(`
-      id, purpose, status, currency, approved_amount, amount_requested,
+      id, purpose, purpose_description, status, currency, approved_amount, amount_requested,
       loan_kind, product_name, interest_rate,
       monthly_payment, total_repayment, term_months, maturity_date,
       verification_mode, payment_channel,

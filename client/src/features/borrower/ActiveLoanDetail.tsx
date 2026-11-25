@@ -8,7 +8,8 @@ import { CreditGradeBadge } from '@/components/shared/CreditGradeBadge'
 import { TableSkeleton } from '@/components/shared/LoadingSkeleton'
 import { toast } from 'sonner'
 import type { Loan, LoanScheduleItem } from '@lendflow/shared'
-import { LOAN_PURPOSE_LABELS, quoteAdvance } from '@lendflow/shared'
+import { quoteAdvance } from '@lendflow/shared'
+import { loanTitle } from '@/lib/loan-label'
 import { CheckCircle, Clock, AlertCircle, XCircle } from 'lucide-react'
 
 const CANCEL_REASONS = [
@@ -127,8 +128,14 @@ export function ActiveLoanDetail() {
     <div className="max-w-4xl mx-auto space-y-8">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          <h1 className="page-heading break-words">{loan.loan_kind === 'product' && loan.product_name ? loan.product_name : (LOAN_PURPOSE_LABELS[loan.purpose] ?? loan.purpose)}</h1>
-          {loan.loan_kind === 'product' && <p className="text-sm text-muted-foreground">Product loan</p>}
+          <h1 className="page-heading break-words">{loanTitle(loan)}</h1>
+          <p className="text-sm text-muted-foreground">
+            {[
+              loan.loan_kind === 'product' ? 'Product' : 'Cash',
+              loan.interest_rate && loan.interest_rate > 0 ? formatPercent(loan.interest_rate) : null,
+              loan.maturity_date ? `due ${formatDate(loan.maturity_date)}` : null,
+            ].filter(Boolean).join(' · ')}
+          </p>
           <div className="flex items-center gap-3 mt-1 flex-wrap">
             <StatusBadge status={loan.status} />
             <CreditGradeBadge grade={loan.admin_override_grade ?? loan.ai_credit_grade} />

@@ -5,8 +5,13 @@ import { useAuth } from '@/context/AuthContext'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { formatCents, formatDate, daysUntil, useCurrency } from '@/lib/utils'
-import { LOAN_PURPOSE_LABELS } from '@lendflow/shared'
+import { loanBalance, loanTitle, personName } from '@/lib/loan-label'
 import type { Loan } from '@lendflow/shared'
+
+interface BorrowerLoan extends Loan {
+  funding_commitments?: { users?: { name?: string } | { name?: string }[] | null }[]
+  loan_schedule?: { due_date: string; total_due: number; total_paid?: number | null; status: string }[]
+}
 import { Search, ArrowRight, Clock, ChevronRight } from 'lucide-react'
 
 export function BorrowerDashboard() {
@@ -16,7 +21,7 @@ export function BorrowerDashboard() {
   const { data: loans, isLoading } = useQuery({
     queryKey: ['borrower-loans'],
     queryFn: async () => {
-      const { data } = await api.get<{ loans: Loan[] }>('/api/loans')
+      const { data } = await api.get<{ loans: BorrowerLoan[] }>('/api/loans')
       return data.loans
     },
   })
@@ -26,10 +31,11 @@ export function BorrowerDashboard() {
   const pastLoans = loans?.filter(l => ['completed', 'rejected', 'cancelled', 'defaulted'].includes(l.status)) ?? []
 
   const nextPayment = activeLoans
-    .filter(l => l.first_payment_date)
-    .sort((a, b) => new Date(a.first_payment_date!).getTime() - new Date(b.first_payment_date!).getTime())[0]
+    .map(loan => ({ loan, ...loanBalance(loan.loan_schedule) }))
+    .filter(item => item.nextDue)
+    .sort((a, b) => a.nextDue!.localeCompare(b.nextDue!))[0]
 
-  const daysLeft = nextPayment?.first_payment_date ? daysUntil(nextPayment.first_payment_date) : null
+  const daysLeft = nextPayment?.nextDue ? daysUntil(nextPayment.nextDue) : null
 
   return (
     <div className="max-w-4xl mx-auto space-y-7">
@@ -43,19 +49,20 @@ export function BorrowerDashboard() {
 
       {/* Next payment card */}
       {nextPayment && daysLeft !== null && (
-        <Link to={`/borrower/loans/${nextPayment.id}`}
+        <Link to={`/borrower/loans/${nextPayment.loan.id}`}
           className={`block rounded-2xl p-5 md:p-6 text-white shadow-card-md active:scale-[0.99] transition-transform ${
             daysLeft <= 3 ? 'bg-red-500' : 'bg-gradient-to-br from-primary to-violet-700'
           }`}>
           <p className="text-xs text-white/70 font-medium uppercase tracking-wide">
             {daysLeft <= 0 ? 'Payment due today' : `Payment in ${daysLeft} day${daysLeft !== 1 ? 's' : ''}`}
           </p>
-          <p className="text-3xl sm:text-4xl font-bold mt-1 tabular-nums">{formatCents(nextPayment.monthly_payment ?? 0)}</p>
-          <div className="flex items-center justify-between mt-2">
-            <p className="text-sm text-white/80">
-              {LOAN_PURPOSE_LABELS[nextPayment.purpose] ?? nextPayment.purpose}
+          <p className="text-3xl sm:text-4xl font-bold mt-1 tabular-nums">{formatCents(nextPayment.remaining, nextPayment.loan.currency)}</p>
+          <div className="flex items-center justify-between mt-2 gap-3">
+            <p className="text-sm text-white/80 break-words">
+              {loanTitle(nextPayment.loan)}
+              {nextPayment.nextDue ? ` · due ${formatDate(nextPayment.nextDue)}` : ''}
             </p>
-            <ArrowRight className="h-4 w-4 text-white/60" />
+            <ArrowRight className="h-4 w-4 text-white/60 shrink-0" />
           </div>
         </Link>
       )}
@@ -87,8 +94,8 @@ export function BorrowerDashboard() {
               <Link key={loan.id} to={`/borrower/loans/${loan.id}`}
                 className="flex items-center justify-between gap-3 card-base interactive-card p-4">
                 <div className="min-w-0">
-                  <p className="font-medium text-sm truncate">{LOAN_PURPOSE_LABELS[loan.purpose] ?? loan.purpose}</p>
-                  <p className="text-xs text-muted-foreground">{formatCents(loan.amount_requested)} · {loan.term_months}mo</p>
+                  <p className="font-medium text-sm break-words">{loanTitle(loan)}</p>
+                  <p className="text-xs text-muted-foreground">{formatCents(loan.amount_requested, loan.currency)} · {loan.term_months}mo</p>
                   {/* Status bar */}
                   {['submitted', 'under_review'].includes(loan.status) && (
                     <div className="flex items-center gap-1 mt-1.5">
@@ -119,9 +126,18 @@ export function BorrowerDashboard() {
               <Link key={loan.id} to={`/borrower/loans/${loan.id}`}
                 className="flex items-center justify-between gap-3 card-base interactive-card p-4">
                 <div className="min-w-0">
-                  <p className="font-medium text-sm truncate">{LOAN_PURPOSE_LABELS[loan.purpose] ?? loan.purpose}</p>
+                  <p className="font-medium text-sm break-words">{loanTitle(loan)}</p>
                   <p className="text-xs text-muted-foreground">
-                    {formatCents(loan.approved_amount ?? 0)} · {formatCents(loan.monthly_payment ?? 0)}/mo
+                    {(() => {
+                      const { remaining, paid, nextDue } = loanBalance(loan.loan_schedule)
+                      const lender = personName(loan.funding_commitments?.[0]?.users)
+                      return [
+                        lender,
+                        `${formatCents(remaining, loan.currency)} left`,
+                        nextDue ? `due ${formatDate(nextDue)}` : null,
+                        paid > 0 ? `${formatCents(paid, loan.currency)} paid` : null,
+                      ].filter(Boolean).join(' · ')
+                    })()}
                   </p>
                 </div>
                 <ChevronRight className="h-4 w-4 text-muted-foreground" />
@@ -156,8 +172,8 @@ export function BorrowerDashboard() {
               <Link key={loan.id} to={`/borrower/loans/${loan.id}`}
                 className="flex items-center justify-between rounded-xl px-4 py-3 hover:bg-muted transition-colors">
                 <div>
-                  <p className="text-sm font-medium">{LOAN_PURPOSE_LABELS[loan.purpose] ?? loan.purpose}</p>
-                  <p className="text-xs text-muted-foreground">{formatCents(loan.amount_requested)} · {formatDate(loan.created_at)}</p>
+                  <p className="text-sm font-medium break-words">{loanTitle(loan)}</p>
+                  <p className="text-xs text-muted-foreground">{formatCents(loan.amount_requested, loan.currency)} · {formatDate(loan.created_at)}</p>
                 </div>
                 <StatusBadge status={loan.status} />
               </Link>

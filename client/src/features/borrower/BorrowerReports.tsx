@@ -6,7 +6,7 @@ import { EmptyState } from '@/components/shared/EmptyState'
 import { FileText, Download } from 'lucide-react'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import type { LoanScheduleItem, Loan } from '@lendflow/shared'
-import { LOAN_PURPOSE_LABELS } from '@lendflow/shared'
+import { loanTitle } from '@/lib/loan-label'
 
 interface LoanWithPayments extends Loan {
   schedule?: LoanScheduleItem[]
@@ -52,7 +52,7 @@ export function BorrowerReports() {
     const rows = [
       ['Loan Purpose', 'Status', 'Original Amount', 'Term (months)', 'Interest Rate', 'Date Applied'],
       ...activeAndCompleted.map(l => [
-        LOAN_PURPOSE_LABELS[l.purpose] ?? l.purpose,
+        loanTitle(l),
         l.status,
         (l.approved_amount ?? l.amount_requested) / 100,
         l.term_months,
@@ -155,7 +155,7 @@ export function BorrowerReports() {
                 return (
                   <div key={loan.id} className="p-4 space-y-2">
                     <div className="flex items-start justify-between gap-3">
-                      <p className="font-medium">{LOAN_PURPOSE_LABELS[loan.purpose] ?? loan.purpose}</p>
+                      <p className="font-medium">{loanTitle(loan)}</p>
                       <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${
                         loan.status === 'completed' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'
                       }`}>
@@ -193,7 +193,7 @@ export function BorrowerReports() {
                     : null
                   return (
                     <tr key={loan.id} className="border-b last:border-0 hover:bg-muted/30">
-                      <td className="p-3 font-medium">{LOAN_PURPOSE_LABELS[loan.purpose] ?? loan.purpose}</td>
+                      <td className="p-3 font-medium">{loanTitle(loan)}</td>
                       <td className="p-3 text-right font-mono">{formatCents(loan.approved_amount ?? loan.amount_requested)}</td>
                       <td className="p-3 text-right">{loan.interest_rate ? formatPercent(loan.interest_rate) : '—'}</td>
                       <td className="p-3 text-right">{loan.term_months}mo</td>
@@ -240,7 +240,7 @@ export function BorrowerReports() {
                   return (
                     <div key={loan.id}>
                       <div className="flex flex-col gap-0.5 sm:flex-row sm:justify-between text-sm mb-1">
-                        <span>{LOAN_PURPOSE_LABELS[loan.purpose] ?? loan.purpose}</span>
+                        <span>{loanTitle(loan)}</span>
                         <span className="text-muted-foreground">{formatCents(interest)} interest on {formatCents(principal)}</span>
                       </div>
                       <div className="h-2 rounded-full bg-muted overflow-hidden">

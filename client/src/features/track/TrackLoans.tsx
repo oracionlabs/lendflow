@@ -2,8 +2,8 @@ import { useQuery } from '@tanstack/react-query'
 import { useParams } from 'react-router-dom'
 import api from '@/lib/api'
 import { formatCents, formatDate } from '@/lib/utils'
-import { LOAN_PURPOSE_LABELS, quoteAdvance } from '@lendflow/shared'
-import type { LoanPurpose } from '@lendflow/shared'
+import { quoteAdvance } from '@lendflow/shared'
+import { loanBalance, loanTitle } from '@/lib/loan-label'
 
 interface ScheduleRow {
   installment_number: number
@@ -22,6 +22,7 @@ interface ScheduleRow {
 interface TrackLoan {
   id: string
   purpose: string
+  purpose_description?: string | null
   loan_kind?: string
   product_name?: string | null
   status: string
@@ -99,6 +100,7 @@ export function TrackLoans() {
           {data.loans.map(loan => {
             const amount = loan.approved_amount ?? loan.amount_requested
             const schedule = [...(loan.loan_schedule ?? [])].sort((a, b) => a.installment_number - b.installment_number)
+            const { remaining, paid, nextDue } = loanBalance(schedule)
             const advance = quoteAdvance(schedule.map(row => ({
               ...row,
               principal_due: row.principal_due ?? 0,
@@ -109,11 +111,18 @@ export function TrackLoans() {
               <section key={loan.id} className="card-base p-5 sm:p-6 space-y-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="font-semibold">{loan.loan_kind === 'product' && loan.product_name ? loan.product_name : (LOAN_PURPOSE_LABELS[loan.purpose as LoanPurpose] ?? loan.purpose)}</p>
-                    {loan.loan_kind === 'product' && <p className="text-xs text-muted-foreground">Product loan</p>}
+                    <p className="font-semibold break-words">{loanTitle(loan)}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {[
+                        loan.loan_kind === 'product' ? 'Product' : 'Cash',
+                        `${formatCents(remaining, loan.currency)} left`,
+                        nextDue ? `due ${formatDate(nextDue)}` : null,
+                        paid > 0 ? `${formatCents(paid, loan.currency)} paid of ${formatCents(amount, loan.currency)}` : null,
+                      ].filter(Boolean).join(' · ')}
+                    </p>
                     <p className="text-xs text-muted-foreground capitalize mt-0.5">{loan.status.replaceAll('_', ' ')}</p>
                   </div>
-                  <p className="font-bold tabular-nums">{formatCents(amount, loan.currency)}</p>
+                  <p className="font-bold tabular-nums">{formatCents(remaining || amount, loan.currency)}</p>
                 </div>
                 {early && (
                   <p className="text-sm text-muted-foreground">

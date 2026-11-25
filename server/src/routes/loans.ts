@@ -53,7 +53,15 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
   if (user.role === 'borrower') {
     const { data, error } = await db
       .from('loans')
-      .select('*')
+      .select(`
+        *,
+        funding_commitments (
+          users!lender_id ( name )
+        ),
+        loan_schedule (
+          installment_number, due_date, total_due, total_paid, status
+        )
+      `)
       .eq('borrower_id', user.id)
       .order('created_at', { ascending: false })
 
