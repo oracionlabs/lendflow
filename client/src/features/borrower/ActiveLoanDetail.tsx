@@ -143,7 +143,11 @@ export function ActiveLoanDetail() {
         </div>
         <div className="sm:text-right space-y-2">
           <p className="text-2xl sm:text-3xl font-bold break-words">{fmt(loan.approved_amount ?? 0)}</p>
-          <p className="text-sm text-muted-foreground">{loan.term_months} month term</p>
+          <p className="text-sm text-muted-foreground">
+            {loan.repayment_type === 'dated'
+              ? `${schedule?.length ?? loan.term_months} payments on specific dates`
+              : `${loan.term_months} month term`}
+          </p>
           {CANCELLABLE.includes(loan.status) && !showCancel && (
             <button
               onClick={() => setShowCancel(true)}
@@ -201,8 +205,11 @@ export function ActiveLoanDetail() {
         <>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="card-base p-4">
-              <p className="text-xs text-muted-foreground">Monthly Payment</p>
-              <p className="text-xl font-bold mt-1">{fmt(loan.monthly_payment ?? 0)}</p>
+              <p className="text-xs text-muted-foreground">{loan.repayment_type === 'dated' ? 'Next payment' : 'Monthly Payment'}</p>
+              <p className="text-xl font-bold mt-1">{fmt(loan.repayment_type === 'dated' ? Math.max(0, (nextDue?.total_due ?? 0) - (nextDue?.total_paid ?? 0)) : (loan.monthly_payment ?? 0))}</p>
+              {loan.repayment_type === 'dated' && nextDue && (
+                <p className="text-xs text-muted-foreground mt-1">{formatDate(nextDue.due_date)}</p>
+              )}
             </div>
             <div className="card-base p-4">
               <p className="text-xs text-muted-foreground">Interest Rate</p>

@@ -36,6 +36,7 @@ interface CommitmentDetail {
     id: string
     purpose: string
     term_months: number
+    repayment_type?: string
     interest_rate: number
     ai_credit_grade?: string
     admin_override_grade?: string
@@ -209,7 +210,7 @@ export function CommitmentDetail() {
               <CreditGradeBadge grade={grade} />
             </div>
             <p className="text-xs text-muted-foreground">
-              Funded {formatDate(commitment.funded_at)} · {loan.term_months}mo · {formatPercent(loan.interest_rate)}
+              Funded {formatDate(commitment.funded_at)} · {loan.repayment_type === 'dated' ? `${schedule?.length ?? loan.term_months} dates` : `${loan.term_months}mo`} · {loan.repayment_type === 'dated' && !loan.interest_rate ? 'No interest' : formatPercent(loan.interest_rate)}
             </p>
           </div>
           <div className="text-right flex-shrink-0">
@@ -473,7 +474,9 @@ export function CommitmentDetail() {
           <div className="space-y-2.5">
             {[
               { label: 'Loan Amount', value: fmt(loan.approved_amount) },
-              { label: 'Monthly Payment', value: fmt(loan.monthly_payment) },
+              loan.repayment_type === 'dated'
+                ? { label: 'Payments', value: `${schedule?.length ?? 0} specific dates` }
+                : { label: 'Monthly Payment', value: fmt(loan.monthly_payment) },
               { label: 'Total Repayment', value: fmt(loan.total_repayment) },
               { label: 'First Payment', value: loan.first_payment_date ? formatDate(loan.first_payment_date) : '—' },
               { label: 'Maturity', value: loan.maturity_date ? formatDate(loan.maturity_date) : '—' },

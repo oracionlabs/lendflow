@@ -26,6 +26,7 @@ export interface DashboardLoan {
   id?: string
   purpose: string
   term_months: number
+  repayment_type?: string
   interest_rate: number
   status: string
   currency?: string
@@ -84,7 +85,7 @@ export function CommitmentCard({
         {[
           ['Lent', formatCents(amount, currency)],
           ['Rate', formatPercent(loan.interest_rate ?? 0)],
-          ['Term', `${loan.term_months} mo`],
+          ['Term', loan.repayment_type === 'dated' ? `${schedule.length} dates` : `${loan.term_months} mo`],
           ['Remaining', formatCents(remaining, currency)],
         ].map(([label, value]) => (
           <div key={label}>

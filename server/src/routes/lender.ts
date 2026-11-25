@@ -99,7 +99,7 @@ router.get('/commitments', async (req: Request, res: Response): Promise<void> =>
     .select(`
       *,
       loans (
-        id, purpose, term_months, interest_rate, ai_credit_grade,
+        id, purpose, repayment_type, term_months, interest_rate, ai_credit_grade,
         admin_override_grade, status, first_payment_date, maturity_date,
         amount_requested, approved_amount, monthly_payment, currency,
         loan_kind, product_name, payment_channel,
@@ -122,7 +122,7 @@ router.get('/commitments/:id', async (req: Request, res: Response): Promise<void
     .select(`
       *,
       loans (
-        id, purpose, purpose_description, term_months, interest_rate,
+        id, purpose, purpose_description, repayment_type, term_months, interest_rate,
         ai_credit_grade, admin_override_grade, ai_reasoning, ai_risk_factors,
         status, first_payment_date, maturity_date, amount_requested, approved_amount,
         monthly_payment, total_repayment, currency, borrower_id,
@@ -296,6 +296,7 @@ router.post('/loans/new', async (req: Request, res: Response): Promise<void> => 
     waive_docs,
     loan_kind,
     product_name,
+    payments,
   } = req.body as {
     borrower_name: string
     borrower_email?: string
@@ -316,6 +317,7 @@ router.post('/loans/new', async (req: Request, res: Response): Promise<void> => 
     waive_docs?: boolean
     loan_kind?: 'cash' | 'product'
     product_name?: string
+    payments?: { due_date?: string; amount?: number }[]
   }
 
   // repayment_type is the new field; payment_type is legacy — accept both
@@ -346,6 +348,21 @@ router.post('/loans/new', async (req: Request, res: Response): Promise<void> => 
   if (effectiveRepaymentType === 'custom_schedule' && (!termMonthsInput || !payment_frequency)) {
     res.status(400).json({ error: 'term_months and payment_frequency are required for custom_schedule' })
     return
+  }
+  const datedPayments = (payments ?? [])
+    .map(row => ({ due_date: row.due_date ?? '', amount: Math.round(row.amount ?? 0) }))
+    .filter(row => row.due_date || row.amount)
+    .sort((a, b) => a.due_date.localeCompare(b.due_date))
+  if (effectiveRepaymentType === 'dated') {
+    if (!datedPayments.length || datedPayments.some(row => !/^\d{4}-\d{2}-\d{2}$/.test(row.due_date) || row.amount <= 0)) {
+      res.status(400).json({ error: 'Each payment needs a date and an amount' })
+      return
+    }
+    const datedTotal = datedPayments.reduce((sum, row) => sum + row.amount, 0)
+    if (datedTotal !== amount_requested) {
+      res.status(400).json({ error: 'Payment amounts must add up to the loan amount' })
+      return
+    }
   }
 
   const db = supabaseAdmin()
@@ -424,7 +441,14 @@ router.post('/loans/new', async (req: Request, res: Response): Promise<void> => 
   let term_months: number
   let maturityDate: string
 
-  if (effectiveRepaymentType === 'lump_sum') {
+  if (effectiveRepaymentType === 'dated') {
+    const first = datedPayments[0].due_date
+    const last = datedPayments[datedPayments.length - 1].due_date
+    const start = new Date(`${first}T00:00:00Z`)
+    const end = new Date(`${last}T00:00:00Z`)
+    term_months = Math.max(1, (end.getUTCFullYear() - start.getUTCFullYear()) * 12 + (end.getUTCMonth() - start.getUTCMonth()))
+    maturityDate = last
+  } else if (effectiveRepaymentType === 'lump_sum') {
     const dueD = new Date(due_date!)
     term_months = Math.max(1,
       (dueD.getFullYear() - today.getFullYear()) * 12 + (dueD.getMonth() - today.getMonth())
@@ -453,9 +477,9 @@ router.post('/loans/new', async (req: Request, res: Response): Promise<void> => 
     purpose_description: [notes, borrower_phone ? `Phone: ${borrower_phone}` : ''].filter(Boolean).join(' | '),
     term_months,
     approved_amount: amount_requested,
-    interest_rate,
-    monthly_payment: monthlyPayment,
-    total_repayment: totalRepayment,
+    interest_rate: effectiveRepaymentType === 'dated' ? 0 : interest_rate,
+    monthly_payment: effectiveRepaymentType === 'dated' ? datedPayments[0].amount : monthlyPayment,
+    total_repayment: effectiveRepaymentType === 'dated' ? amount_requested : totalRepayment,
     origination_fee: 0,
     origination_fee_percent: 0,
     repayment_type: effectiveRepaymentType,
@@ -475,14 +499,14 @@ router.post('/loans/new', async (req: Request, res: Response): Promise<void> => 
     reviewed_by: lender.id,
     reviewed_at: today.toISOString(),
     disbursed_at: today.toISOString(),
-    first_payment_date: firstPaymentStr,
+    first_payment_date: effectiveRepaymentType === 'dated' ? datedPayments[0].due_date : firstPaymentStr,
     maturity_date: maturityDate,
   }).select().single()
 
   if (loanErr || !loan) { res.status(500).json({ error: loanErr?.message }); return }
 
   // Create 100% funding commitment for the lender
-  const totalInterest = totalRepayment - amount_requested
+  const totalInterest = effectiveRepaymentType === 'dated' ? 0 : totalRepayment - amount_requested
   await db.from('funding_commitments').insert({
     lender_id: lender.id,
     loan_id: loan.id,
@@ -504,7 +528,15 @@ router.post('/loans/new', async (req: Request, res: Response): Promise<void> => 
 
   let scheduleRows: { installment_number: number; due_date: string; principal_due: number; interest_due: number; total_due: number }[]
 
-  if (effectiveRepaymentType === 'lump_sum') {
+  if (effectiveRepaymentType === 'dated') {
+    scheduleRows = datedPayments.map((row, index) => ({
+      installment_number: index + 1,
+      due_date: row.due_date,
+      principal_due: row.amount,
+      interest_due: 0,
+      total_due: row.amount,
+    }))
+  } else if (effectiveRepaymentType === 'lump_sum') {
     scheduleRows = [{ installment_number: 1, due_date: maturityDate, principal_due: amount_requested, interest_due: totalRepayment - amount_requested, total_due: totalRepayment }]
   } else if (effectiveRepaymentType === 'interest_only') {
     const result = calculateInterestOnly(amount_requested, interest_rate, term_months, firstPaymentStr)

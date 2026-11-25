@@ -11,7 +11,7 @@ import { DatePicker } from '@/components/shared/DatePicker'
 
 const PURPOSES = Object.entries(LOAN_PURPOSE_LABELS)
 
-type PaymentType = 'lump_sum' | 'installments' | 'interest_only' | 'daily_interest' | 'custom_schedule'
+type PaymentType = 'lump_sum' | 'installments' | 'interest_only' | 'daily_interest' | 'custom_schedule' | 'dated'
 type RatePeriod = 'per_15_days' | 'per_30_days' | 'monthly' | 'annually' | 'flat' | 'daily'
 type PaymentFrequency = 'weekly' | 'bi_weekly' | 'monthly' | 'quarterly'
 type Step = 1 | 2 | 3 | 4
@@ -71,6 +71,7 @@ const PAYMENT_TYPES: { v: PaymentType; label: string; desc: string }[] = [
   { v: 'interest_only',   label: 'Interest-Only',        desc: 'Interest monthly + balloon' },
   { v: 'daily_interest',  label: 'Daily Interest',       desc: 'Accrues daily, flexible repay' },
   { v: 'custom_schedule', label: 'Custom Schedule',      desc: 'Choose payment frequency' },
+  { v: 'dated',           label: 'Specific dates',       desc: 'Each payment has its own date and amount' },
 ]
 
 const FREQUENCY_OPTIONS: { v: PaymentFrequency; label: string }[] = [
@@ -110,6 +111,7 @@ export function LoanOrigination() {
   const [waiveDocs, setWaiveDocs] = useState(true)
   const [accessToken, setAccessToken] = useState<string | null>(null)
   const [dueDateMode, setDueDateMode] = useState<'days' | 'date'>('days')
+  const [payments, setPayments] = useState<{ due_date: string; amount: string }[]>([{ due_date: '', amount: '' }])
   const [receipt, setReceipt] = useState<File | null>(null)
   const [receiptPreview, setReceiptPreview] = useState<string | null>(null)
   const [done, setDone] = useState(false)
@@ -144,9 +146,14 @@ export function LoanOrigination() {
     return form.term_months * 30
   }, [form.payment_type, form.lump_sum_days, form.term_months, form.max_term_days])
 
+  const datedAssigned = payments.reduce((sum, row) => sum + Math.round(Number(row.amount || 0) * 100), 0)
+
   const calc = useMemo(() => {
     const p = form.amount
     const r = form.interest_rate / 100
+    if (form.payment_type === 'dated') {
+      return { monthlyPayment: 0, totalRepayment: datedAssigned, totalInterest: 0 }
+    }
 
     // Interest-only: pay r/month interest, full principal in last payment
     if (form.payment_type === 'interest_only') {
@@ -199,7 +206,7 @@ export function LoanOrigination() {
     }
     const monthly = term > 0 ? Math.round(totalRep / term) : 0
     return { monthlyPayment: monthly, totalRepayment: monthly * term, totalInterest: monthly * term - p }
-  }, [form.amount, form.interest_rate, form.rate_period, form.payment_type, form.payment_frequency, form.max_term_days, term, durationDays])
+  }, [form.amount, form.interest_rate, form.rate_period, form.payment_type, form.payment_frequency, form.max_term_days, term, durationDays, datedAssigned])
 
   const { monthlyPayment, totalRepayment, totalInterest } = calc
   const balloonPayment = (calc as { balloonPayment?: number }).balloonPayment
@@ -224,10 +231,13 @@ export function LoanOrigination() {
         purpose: form.purpose,
         notes: form.notes || undefined,
         amount_requested: form.amount,
-        interest_rate: annualRate,
-        monthly_payment: monthlyPayment,
-        total_repayment: totalRepayment,
+        interest_rate: form.payment_type === 'dated' ? 0 : annualRate,
+        monthly_payment: form.payment_type === 'dated' ? Math.round(Number(payments.find(row => Number(row.amount) > 0)?.amount || 0) * 100) : monthlyPayment,
+        total_repayment: form.payment_type === 'dated' ? form.amount : totalRepayment,
         repayment_type: form.payment_type,
+        payments: form.payment_type === 'dated'
+          ? payments.map(row => ({ due_date: row.due_date, amount: Math.round(Number(row.amount) * 100) }))
+          : undefined,
         due_date: form.payment_type === 'lump_sum' ? computedDueDate : undefined,
         term_months: ['installments', 'interest_only', 'custom_schedule'].includes(form.payment_type) ? form.term_months : undefined,
         payment_frequency: form.payment_type === 'custom_schedule' ? form.payment_frequency : undefined,
@@ -261,13 +271,16 @@ export function LoanOrigination() {
 
   // Step validity
   const step1Valid = form.borrower_name.trim().length > 0
-  const step2Valid = form.amount > 0 && (form.loan_kind === 'product' ? form.interest_rate >= 0 && form.product_name.trim().length > 0 : form.interest_rate > 0) && (() => {
+  const step2Valid = form.amount > 0 && (form.loan_kind === 'product' ? form.product_name.trim().length > 0 : true) && (form.payment_type === 'dated' || (form.loan_kind === 'product' ? form.interest_rate >= 0 : form.interest_rate > 0)) && (() => {
     switch (form.payment_type) {
       case 'installments':    return form.term_months > 0
       case 'lump_sum':        return dueDateMode === 'days' ? form.lump_sum_days > 0 : !!form.due_date
       case 'interest_only':   return form.term_months > 0
       case 'daily_interest':  return form.max_term_days > 0
       case 'custom_schedule': return form.term_months > 0 && !!form.payment_frequency
+      case 'dated': return payments.length > 0
+        && payments.every(row => /^\d{4}-\d{2}-\d{2}$/.test(row.due_date) && Number(row.amount) > 0)
+        && datedAssigned === form.amount
     }
   })()
 
@@ -284,7 +297,7 @@ export function LoanOrigination() {
         <div>
           <h2 className="text-xl font-bold">Loan recorded</h2>
           <p className="text-muted-foreground text-sm mt-1">
-            {formatCents(form.amount)} · {form.interest_rate}% p.a. · {form.payment_type === 'lump_sum' ? `Due in ${form.lump_sum_days} days` : `${form.term_months} months`}
+            {formatCents(form.amount)} · {form.payment_type === 'dated' ? `${payments.length} specific dates` : form.payment_type === 'lump_sum' ? `Due in ${form.lump_sum_days} days` : `${form.interest_rate}% p.a. · ${form.term_months} months`}
           </p>
           <p className="text-sm text-muted-foreground mt-2">
             {form.borrower_name}'s repayment schedule is now active.
@@ -458,7 +471,50 @@ export function LoanOrigination() {
             </select>
           </div>
 
-          <div className="space-y-2">
+          {form.payment_type === 'dated' && (
+            <div className="space-y-3">
+              <div>
+                <Label>Payment dates <span className="text-destructive">*</span></Label>
+                <p className="text-xs text-muted-foreground">Each date has its own amount. They must add up to the loan amount. Nothing here is monthly.</p>
+              </div>
+              {payments.map((row, index) => (
+                <div key={index} className="grid grid-cols-[1fr_8rem_auto] items-center gap-2">
+                  <DatePicker
+                    value={row.due_date}
+                    onChange={value => setPayments(list => list.map((item, i) => i === index ? { ...item, due_date: value } : item))}
+                    placeholder="Payment date"
+                  />
+                  <Input
+                    type="number"
+                    min={1}
+                    value={row.amount}
+                    onChange={e => setPayments(list => list.map((item, i) => i === index ? { ...item, amount: e.target.value } : item))}
+                    placeholder="Amount"
+                  />
+                  <button
+                    type="button"
+                    disabled={payments.length === 1}
+                    onClick={() => setPayments(list => list.filter((_, i) => i !== index))}
+                    className="min-h-11 px-2 text-sm text-muted-foreground disabled:opacity-40"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={() => setPayments(list => [...list, { due_date: '', amount: '' }])}
+                className="text-sm font-semibold text-accent"
+              >
+                Add a date
+              </button>
+              <p className="text-xs text-muted-foreground">
+                {formatCents(datedAssigned, form.currency)} assigned of {formatCents(form.amount, form.currency)}
+              </p>
+            </div>
+          )}
+
+          {form.payment_type !== 'dated' && <div className="space-y-2">
             <Label>Interest rate <span className="text-destructive">*</span></Label>
             <div className="relative">
               <input
@@ -491,7 +547,7 @@ export function LoanOrigination() {
             <p className="text-xs text-muted-foreground">
               {RATE_OPTIONS.find(o => o.value === form.rate_period)?.desc}
             </p>
-          </div>
+          </div>}
 
           {['installments', 'interest_only', 'custom_schedule'].includes(form.payment_type) && (
             <div>
@@ -614,8 +670,10 @@ export function LoanOrigination() {
                 form.borrower_phone ? { label: 'Phone', value: form.borrower_phone } : null,
                 { label: 'Amount', value: formatCents(form.amount) },
                 { label: 'Repayment type', value: PAYMENT_TYPES.find(t => t.v === form.payment_type)?.label ?? form.payment_type },
-                { label: 'Interest rate', value: `${form.interest_rate}% ${RATE_OPTIONS.find(o => o.value === form.rate_period)?.label.toLowerCase()}` },
-                form.payment_type === 'lump_sum'
+                form.payment_type === 'dated' ? null : { label: 'Interest rate', value: `${form.interest_rate}% ${RATE_OPTIONS.find(o => o.value === form.rate_period)?.label.toLowerCase()}` },
+                form.payment_type === 'dated'
+                  ? { label: 'Payments', value: payments.map(row => `${row.due_date} ${formatCents(Math.round(Number(row.amount || 0) * 100), form.currency)}`).join(' · '), accent: true }
+                  : form.payment_type === 'lump_sum'
                   ? { label: 'Due date', value: `${form.lump_sum_days} days (${computedDueDate})`, accent: true }
                   : form.payment_type === 'interest_only'
                   ? { label: 'Monthly interest', value: `${formatCents(monthlyPayment)} × ${form.term_months - 1} months`, accent: true }
@@ -628,7 +686,7 @@ export function LoanOrigination() {
                   ? { label: 'Balloon payment', value: formatCents(balloonPayment) }
                   : null,
                 { label: 'Total repayment', value: formatCents(totalRepayment) },
-                { label: 'Total interest', value: formatCents(totalInterest) },
+                form.payment_type === 'dated' ? null : { label: 'Total interest', value: formatCents(totalInterest) },
                 { label: 'Purpose', value: LOAN_PURPOSE_LABELS[form.purpose] ?? form.purpose },
               ].filter(Boolean).map((row) => {
                 const r = row!

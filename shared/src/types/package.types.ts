@@ -4,6 +4,7 @@ export type RepaymentType =
   | 'interest_only'
   | 'daily_interest'
   | 'custom_schedule'
+  | 'dated'
 
 export type RatePeriod =
   | 'per_15_days'
@@ -39,6 +40,7 @@ export const REPAYMENT_TYPE_LABELS: Record<RepaymentType, string> = {
   interest_only:   'Interest-Only + Balloon',
   daily_interest:  'Daily Interest (Flexible)',
   custom_schedule: 'Custom Schedule',
+  dated:           'Specific dates',
 }
 
 export const RATE_PERIOD_LABELS: Record<RatePeriod, string> = {
