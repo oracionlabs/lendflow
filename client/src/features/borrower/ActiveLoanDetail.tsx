@@ -288,16 +288,17 @@ export function ActiveLoanDetail() {
                     {interestLeft > 0 && (instapay && pendingInterest ? (
                       <p className="text-sm">Waiting for your lender to record {fmt(pendingInterest.amount ?? interestLeft)}.</p>
                     ) : (
-                      <button type="button" onClick={() => setShowPay(true)} className="min-h-11 rounded-lg border px-4 text-sm font-medium">
-                        Pay interest · {fmt(interestLeft)}
+                      <button type="button" onClick={() => setShowPay(true)} className="flex min-h-11 flex-col items-center justify-center gap-0.5 rounded-lg border px-4 py-2 text-sm font-medium leading-tight">
+                        <span>Pay interest</span>
+                        <span className="num text-[11px] font-normal text-muted-foreground">{fmt(interestLeft)}</span>
                       </button>
                     ))}
                     {fullAmount > 0 && (instapay && pendingFull ? (
                       <p className="text-sm">Waiting for your lender to record the full payment of {fmt(pendingFull.amount ?? fullAmount)}.</p>
                     ) : (
                       <button type="button" onClick={() => setShowPayFull(true)} className="button-primary flex flex-col items-center justify-center gap-0.5 px-4 py-2 leading-tight">
-                        <span>Pay now · {fmt(fullAmount)}</span>
-                        <span className="text-[11px] font-normal opacity-80">full payment</span>
+                        <span>Pay now</span>
+                        <span className="num text-[11px] font-normal opacity-80">{fmt(fullAmount)}</span>
                       </button>
                     ))}
                   </div>
@@ -350,7 +351,6 @@ export function ActiveLoanDetail() {
                   <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#1B2233]/40 p-4 sm:items-center" role="presentation" onClick={() => setShowPayFull(false)}>
                     <div role="dialog" aria-modal="true" aria-labelledby="pay-full-title" className="w-full max-w-sm border border-border bg-card p-6" onClick={event => event.stopPropagation()}>
                       <h2 id="pay-full-title" className="font-serif text-[27px] leading-tight tracking-tight">Pay now</h2>
-                      <p className="mt-1 text-[13.5px] text-muted-foreground">full payment</p>
                       <p className="caps mt-6">Payment if today</p>
                       <p className="num mt-2 text-[44px] leading-none">{fmt(fullAmount)}</p>
                       <dl className="mt-5 grid grid-cols-2 gap-4 border-t border-border pt-4">
