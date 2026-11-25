@@ -121,14 +121,21 @@ export function ActiveLoanDetail() {
   const ask = useMutation({
     mutationFn: (body: { kind: 'extension' | 'interest_only' | 'pay_in_full'; due_date?: string }) =>
       api.post(`/api/loans/${id}/requests`, body),
-    onSuccess: () => {
+    onSuccess: (_res, body) => {
       qc.invalidateQueries({ queryKey: ['loan-requests', id] })
+      qc.invalidateQueries({ queryKey: ['borrower-requests'] })
       setExtendDate('')
       setShowExtend(false)
       setShowPay(false)
       setShowPayFull(false)
       setInterestDueDate('')
-      toast.success('Sent to your lender')
+      toast.success(
+        body.kind === 'pay_in_full'
+          ? 'Sent to your lender. The loan closes only after they confirm the payment.'
+          : body.kind === 'interest_only'
+            ? 'Sent to your lender. Interest and the new due date wait on their confirmation.'
+            : 'Sent to your lender',
+      )
     },
     onError: (err: unknown) => {
       toast.error((err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Could not send that')
@@ -299,7 +306,7 @@ export function ActiveLoanDetail() {
                       </button>
                     ))}
                     {fullAmount > 0 && (instapay && pendingFull ? (
-                      <p className="text-sm">Waiting for your lender to record the full payment of {fmt(pendingFull.amount ?? fullAmount)}.</p>
+                      <p className="text-sm">Waiting for your lender to confirm the pay-off of {fmt(pendingFull.amount ?? fullAmount)}.</p>
                     ) : (
                       <button type="button" onClick={() => setShowPayFull(true)} className="button-primary flex flex-col items-center justify-center gap-0.5 px-4 py-2 leading-tight">
                         <span>Pay now</span>
@@ -363,8 +370,9 @@ export function ActiveLoanDetail() {
                     </div>
                   </dl>
                   <p className="mt-3 text-[13.5px] text-muted-foreground">
-                    This closes the loan at the amount calculated through today.
-                    {instapay ? ' Your lender records it when the money arrives.' : ''}
+                    {instapay
+                      ? 'Send this amount to your lender. The loan stays open until they confirm they received it.'
+                      : 'This closes the loan at the amount calculated through today.'}
                   </p>
                   <div className="mt-6 flex items-center gap-4">
                     <button type="button" onClick={() => setShowPayFull(false)} className="min-h-12 px-1.5 text-sm font-semibold">Cancel</button>
@@ -374,7 +382,7 @@ export function ActiveLoanDetail() {
                       onClick={() => instapay ? ask.mutate({ kind: 'pay_in_full' }) : payFull.mutate()}
                       className="button-primary flex-1"
                     >
-                      {(instapay ? ask.isPending : payFull.isPending) ? 'Sending…' : `Pay now · ${fmt(fullAmount)}`}
+                      {(instapay ? ask.isPending : payFull.isPending) ? 'Sending…' : instapay ? `Ask to confirm · ${fmt(fullAmount)}` : `Pay now · ${fmt(fullAmount)}`}
                     </button>
                   </div>
                 </Modal>

@@ -34,7 +34,7 @@ export function BorrowerRequests({ loanId }: { loanId?: string }) {
       qc.invalidateQueries({ queryKey: ['lender-commitments'] })
       qc.invalidateQueries({ queryKey: ['lender-schedule'] })
       qc.invalidateQueries({ queryKey: ['commitment'] })
-      toast.success(variables.decision === 'accept' ? 'Request accepted' : 'Request declined')
+      toast.success(variables.decision === 'accept' ? 'Confirmed' : 'Declined')
     },
     onError: (err: unknown) => {
       const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Could not update the request'
@@ -65,13 +65,17 @@ export function BorrowerRequests({ loanId }: { loanId?: string }) {
                 {row.kind === 'extension'
                   ? `Extend the due date to ${row.requested_due_date ? formatDate(row.requested_due_date) : 'a later date'}. Extra interest ${formatCents(row.amount ?? 0, row.currency)}.`
                   : row.kind === 'pay_in_full'
-                    ? `Record the full payment of ${formatCents(row.amount ?? 0, row.currency)} calculated through today. This closes the loan.`
+                    ? `Says they paid ${formatCents(row.amount ?? 0, row.currency)} in full. Confirm only if you received it — that closes the loan.`
                     : `Record ${formatCents(row.amount ?? 0, row.currency)} of interest through today and move the principal due to ${row.requested_due_date ? formatDate(row.requested_due_date) : 'a later date'}.`}
               </p>
             </div>
             <div className="flex gap-3">
-              <button type="button" disabled={decide.isPending} onClick={() => decide.mutate({ id: row.id, decision: 'decline' })} className="min-h-11 text-sm font-semibold">Decline</button>
-              <button type="button" disabled={decide.isPending} onClick={() => decide.mutate({ id: row.id, decision: 'accept' })} className="button-primary px-4">Accept</button>
+              <button type="button" disabled={decide.isPending} onClick={() => decide.mutate({ id: row.id, decision: 'decline' })} className="min-h-11 text-sm font-semibold">
+                {row.kind === 'pay_in_full' ? 'Not received' : 'Decline'}
+              </button>
+              <button type="button" disabled={decide.isPending} onClick={() => decide.mutate({ id: row.id, decision: 'accept' })} className="button-primary px-4">
+                {row.kind === 'pay_in_full' ? 'Confirm paid' : 'Accept'}
+              </button>
             </div>
           </div>
         ))}
