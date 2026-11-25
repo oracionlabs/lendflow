@@ -289,14 +289,14 @@ export function ActiveLoanDetail() {
                       <p className="text-sm">Waiting for your lender to record {fmt(pendingInterest.amount ?? interestLeft)}.</p>
                     ) : (
                       <button type="button" onClick={() => setShowPay(true)} className="min-h-11 rounded-lg border px-4 text-sm font-medium">
-                        Pay interest only
+                        Pay interest · {fmt(interestLeft)}
                       </button>
                     ))}
                     {fullAmount > 0 && (instapay && pendingFull ? (
                       <p className="text-sm">Waiting for your lender to record the full payment of {fmt(pendingFull.amount ?? fullAmount)}.</p>
                     ) : (
                       <button type="button" onClick={() => setShowPayFull(true)} className="button-primary flex flex-col items-center justify-center gap-0.5 px-4 py-2 leading-tight">
-                        <span>Pay now</span>
+                        <span>Pay now · {fmt(fullAmount)}</span>
                         <span className="text-[11px] font-normal opacity-80">full payment</span>
                       </button>
                     ))}
@@ -384,8 +384,8 @@ export function ActiveLoanDetail() {
                 {showPay && interestLeft > 0 && (
                   <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#1B2233]/40 p-4 sm:items-center" role="presentation" onClick={() => setShowPay(false)}>
                     <div role="dialog" aria-modal="true" aria-labelledby="pay-now-title" className="w-full max-w-sm border border-border bg-card p-6" onClick={event => event.stopPropagation()}>
-                      <h2 id="pay-now-title" className="font-serif text-[27px] leading-tight tracking-tight">Pay interest only</h2>
-                      <p className="caps mt-6">Interest only</p>
+                      <h2 id="pay-now-title" className="font-serif text-[27px] leading-tight tracking-tight">Pay interest</h2>
+                      <p className="caps mt-6">Interest</p>
                       <p className="num mt-2 text-[44px] leading-none">{fmt(interestLeft)}</p>
                       <p className="mt-3 text-[13.5px] text-muted-foreground">
                         This pays the interest through today. The principal of {fmt(principalLeft)} stays due {formatDate(nextDue.due_date)}.
@@ -399,7 +399,7 @@ export function ActiveLoanDetail() {
                           onClick={() => instapay ? ask.mutate({ kind: 'interest_only' }) : payInterest.mutate()}
                           className="button-primary flex-1"
                         >
-                          {(instapay ? ask.isPending : payInterest.isPending) ? 'Sending…' : `Pay interest only · ${fmt(interestLeft)}`}
+                          {(instapay ? ask.isPending : payInterest.isPending) ? 'Sending…' : `Pay interest · ${fmt(interestLeft)}`}
                         </button>
                       </div>
                     </div>
