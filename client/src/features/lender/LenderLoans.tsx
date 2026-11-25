@@ -9,6 +9,7 @@ import { type DashboardLoan } from '@/features/lender/CommitmentCard'
 import { LOAN_PURPOSE_LABELS } from '@lendflow/shared'
 import type { FundingCommitment } from '@lendflow/shared'
 import { TrendingUp } from 'lucide-react'
+import { LenderCollections } from '@/features/lender/LenderCollections'
 
 interface CommitmentWithLoan extends FundingCommitment {
   loans: DashboardLoan
@@ -68,6 +69,10 @@ function paidOffOn(loan: DashboardLoan) {
 }
 
 export function LenderLoans() {
+  return <LoanBook />
+}
+
+export function LoanBook() {
   useCurrency()
   const qc = useQueryClient()
   const [query, setQuery] = useState('')
@@ -85,12 +90,20 @@ export function LenderLoans() {
     },
   })
 
+  const book = useMemo(() => (commitments ?? []).filter(item => item.loans), [commitments])
+  const activeAll = useMemo(() => book
+    .filter(item => ['active', 'repaying', 'approved', 'funding', 'fully_funded'].includes(item.loans?.status))
+    .sort((a, b) => {
+      const left = openRows(a.loans)[0]?.due_date ?? '9999'
+      const right = openRows(b.loans)[0]?.due_date ?? '9999'
+      return left.localeCompare(right)
+    }), [book])
+
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase()
-    return (commitments ?? []).filter(item => {
+    if (!q) return book
+    return book.filter(item => {
       const loan = item.loans
-      if (!loan) return false
-      if (!q) return true
       const haystack = [
         personName(loan.users),
         loan.product_name,
@@ -100,7 +113,7 @@ export function LenderLoans() {
       ].filter(Boolean).join(' ').toLowerCase()
       return haystack.includes(q)
     })
-  }, [commitments, query])
+  }, [book, query])
 
   const active = rows
     .filter(item => ['active', 'repaying', 'approved', 'funding', 'fully_funded'].includes(item.loans?.status))
@@ -154,7 +167,8 @@ export function LenderLoans() {
 
   return (
     <div className="mx-auto max-w-6xl">
-      <div className="px-6 pb-4 pt-6">
+      <LenderCollections commitments={activeAll} figuresOnly />
+      <div className="px-6 pb-4 pt-2">
         <label className="caps text-muted-foreground" htmlFor="loan-search">Search loans</label>
         <input
           id="loan-search"

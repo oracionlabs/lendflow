@@ -4,8 +4,8 @@ import api from '@/lib/api'
 import { useAuth } from '@/context/AuthContext'
 import { formatCents, useCurrency } from '@/lib/utils'
 import { CardSkeleton } from '@/components/shared/LoadingSkeleton'
-import { CommitmentCard, type DashboardLoan } from '@/features/lender/CommitmentCard'
-import { LenderCollections } from '@/features/lender/LenderCollections'
+import { type DashboardLoan } from '@/features/lender/CommitmentCard'
+import { LoanBook } from '@/features/lender/LenderLoans'
 import type { FundingCommitment } from '@lendflow/shared'
 import { ChevronRight, Plus } from 'lucide-react'
 
@@ -77,8 +77,8 @@ export function PortfolioDashboard() {
   const openLoans = (commitments ?? []).filter(c => ['active', 'repaying'].includes(c.status) || ['active', 'repaying', 'funding', 'fully_funded'].includes(c.loans?.status))
 
   return (
-    <div className="mx-auto max-w-lg">
-      <section className="px-6 pb-[26px] pt-[34px] text-center">
+    <div>
+      <section className="mx-auto max-w-lg px-6 pb-[26px] pt-[34px] text-center">
         <p className="caps">Capital deployed</p>
         <p className="num mt-3 text-[68px] leading-none tracking-[-0.035em]">{formatCents(summary?.total_committed ?? 0)}</p>
         <div className="mx-auto mt-6 grid max-w-xs grid-cols-[1fr_1px_1fr] items-center">
@@ -94,9 +94,10 @@ export function PortfolioDashboard() {
         </div>
       </section>
 
-      <LenderCollections commitments={openLoans} />
+      <LoanBook />
 
-      <div className="mt-[22px] flex items-end justify-between border-b border-foreground px-6 pb-2.5">
+      <div className="mx-auto mt-[22px] max-w-lg">
+      <div className="flex items-end justify-between border-b border-foreground px-6 pb-2.5">
         <p className="caps">Your offers</p>
         <Link to="/lender/listing" className="inline-flex items-center gap-1 text-[13px] font-semibold text-accent">
           <Plus className="h-3.5 w-3.5" strokeWidth={1.75} /> New offer
@@ -138,18 +139,8 @@ export function PortfolioDashboard() {
         </Link>
       ))}
 
-      {openLoans.length > 0 && (
-        <section className="mt-8 space-y-3 px-6">
-          <div className="flex items-end justify-between border-b border-foreground pb-2.5">
-            <p className="caps">Open loans</p>
-            <Link to="/lender/loans" className="text-[13px] font-semibold text-accent">View all</Link>
-          </div>
-          {openLoans.slice(0, 5).map(c => (
-            <CommitmentCard key={c.id} id={c.id} amount={c.amount} loan={c.loans} />
-          ))}
-        </section>
-      )}
       <p className="sr-only">{user?.name}</p>
+      </div>
     </div>
   )
 }

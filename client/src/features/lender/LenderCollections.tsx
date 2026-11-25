@@ -77,7 +77,7 @@ function CollectionList({ title, rows, empty }: { title: string; rows: Collectio
   )
 }
 
-export function LenderCollections({ commitments }: { commitments: CollectionCommitment[] }) {
+export function LenderCollections({ commitments, figuresOnly = false }: { commitments: CollectionCommitment[]; figuresOnly?: boolean }) {
   const rows = rowsFor(commitments)
   const dueToday = rows.filter(row => row.bucket === 'today')
   const upcoming = rows.filter(row => row.bucket === 'upcoming')
@@ -102,9 +102,13 @@ export function LenderCollections({ commitments }: { commitments: CollectionComm
           </div>
         </div>
       </div>
-      <CollectionList title="Due today" rows={dueToday} empty="Nothing due today." />
-      <CollectionList title="Upcoming" rows={upcoming} empty="Nothing due in the next 7 days." />
-      {overdue.length > 0 && <CollectionList title="Overdue" rows={overdue} />}
+      {!figuresOnly && (
+        <>
+          <CollectionList title="Due today" rows={dueToday} empty="Nothing due today." />
+          <CollectionList title="Upcoming" rows={upcoming} empty="Nothing due in the next 7 days." />
+          {overdue.length > 0 && <CollectionList title="Overdue" rows={overdue} />}
+        </>
+      )}
     </section>
   )
 }
