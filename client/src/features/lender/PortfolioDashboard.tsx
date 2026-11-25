@@ -6,6 +6,7 @@ import { formatCents, useCurrency } from '@/lib/utils'
 import { CardSkeleton } from '@/components/shared/LoadingSkeleton'
 import { type DashboardLoan } from '@/features/lender/CommitmentCard'
 import { LoanBook } from '@/features/lender/LenderLoans'
+import { BorrowerRequests } from '@/features/lender/BorrowerRequests'
 import type { FundingCommitment } from '@lendflow/shared'
 import { ChevronRight, Plus } from 'lucide-react'
 
@@ -78,6 +79,7 @@ export function PortfolioDashboard() {
 
   return (
     <div>
+      <BorrowerRequests />
       <section className="mx-auto max-w-lg px-6 pb-[26px] pt-[34px] text-center">
         <p className="caps">Capital deployed</p>
         <p className="num mt-3 text-[68px] leading-none tracking-[-0.035em]">{formatCents(summary?.total_committed ?? 0)}</p>
@@ -94,7 +96,7 @@ export function PortfolioDashboard() {
         </div>
       </section>
 
-      <LoanBook />
+      <LoanBook requests={false} />
 
       <div className="mx-auto mt-[22px] max-w-lg">
       <div className="flex items-end justify-between border-b border-foreground px-6 pb-2.5">

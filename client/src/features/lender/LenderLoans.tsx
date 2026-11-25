@@ -73,7 +73,7 @@ export function LenderLoans() {
   return <LoanBook />
 }
 
-export function LoanBook() {
+export function LoanBook({ requests = true }: { requests?: boolean }) {
   useCurrency()
   const qc = useQueryClient()
   const [query, setQuery] = useState('')
@@ -168,7 +168,7 @@ export function LoanBook() {
 
   return (
     <div className="mx-auto max-w-6xl">
-      <BorrowerRequests />
+      {requests && <BorrowerRequests />}
       <LenderCollections commitments={activeAll} figuresOnly />
       <div className="px-6 pb-4 pt-2">
         <label className="caps text-muted-foreground" htmlFor="loan-search">Search loans</label>

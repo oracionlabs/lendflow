@@ -238,6 +238,90 @@ export function ActiveLoanDetail() {
 
       {['active', 'repaying', 'completed'].includes(loan.status) && (
         <>
+          {nextDue && loan.status !== 'completed' && (() => {
+            const open = (schedule ?? []).filter(row => !['paid', 'waived'].includes(row.status))
+            const today = quoteAsOfToday(open, loan.interest_rate ?? 0)
+            const interestLeft = today?.interest_today ?? 0
+            const principalLeft = today?.principal ?? open.reduce((sum, row) => sum + Math.max(0, row.principal_due - row.principal_paid), 0)
+            const last = open[open.length - 1]
+            const pendingExtension = asks?.find(row => row.kind === 'extension' && row.status === 'pending')
+            const pendingInterest = asks?.find(row => row.kind === 'interest_only' && row.status === 'pending')
+            const extraDays = extendDate && last
+              ? Math.round((Date.parse(`${extendDate}T00:00:00Z`) - Date.parse(`${last.due_date}T00:00:00Z`)) / 86400000)
+              : 0
+            const extra = extraDays > 0 ? Math.round(principalLeft * (loan.interest_rate ?? 0) * extraDays / 365) : 0
+            const instapay = loan.payment_channel === 'instapay'
+            return (
+              <div className="card-base p-5 space-y-5">
+                <div className="space-y-2">
+                  <p className="font-semibold">Request an extension</p>
+                  <p className="text-sm text-muted-foreground">
+                    The principal stays. Extra days add interest, and your lender confirms the new date.
+                    {last ? ` The current full payment is due ${formatDate(last.due_date)}.` : ''}
+                  </p>
+                  {pendingExtension ? (
+                    <p className="text-sm">Waiting for your lender to confirm {pendingExtension.requested_due_date ? formatDate(pendingExtension.requested_due_date) : 'the new date'}.</p>
+                  ) : (
+                    <>
+                      <input
+                        type="date"
+                        value={extendDate}
+                        min={last?.due_date}
+                        onChange={e => setExtendDate(e.target.value)}
+                        className="min-h-11 w-full border border-border bg-background px-3 text-sm"
+                      />
+                      {extraDays > 0 && (
+                        <p className="text-sm">{extraDays} more days adds {fmt(extra)} of interest.</p>
+                      )}
+                      <button
+                        type="button"
+                        disabled={ask.isPending || extraDays <= 0}
+                        onClick={() => ask.mutate({ kind: 'extension', due_date: extendDate })}
+                        className="min-h-11 rounded-lg border px-4 text-sm font-medium disabled:opacity-50"
+                      >
+                        {ask.isPending ? 'Sending…' : 'Request extension'}
+                      </button>
+                    </>
+                  )}
+                </div>
+                {interestLeft > 0 && (
+                  <div className="space-y-2 border-t border-border pt-4">
+                    <p className="font-semibold">Pay interest only</p>
+                    <p className="text-sm text-muted-foreground">
+                      Pay the interest calculated through today, {fmt(interestLeft)}. The principal of {fmt(principalLeft)} stays due {formatDate(nextDue.due_date)}.
+                      {instapay ? ' Your lender records it when the money arrives.' : ''}
+                    </p>
+                    {instapay && pendingInterest ? (
+                      <p className="text-sm">Waiting for your lender to record {fmt(pendingInterest.amount ?? interestLeft)}.</p>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={instapay ? ask.isPending : payInterest.isPending || (walletData?.available_balance ?? 0) < interestLeft}
+                        onClick={() => instapay ? ask.mutate({ kind: 'interest_only' }) : payInterest.mutate()}
+                        className="min-h-11 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+                      >
+                        {(instapay ? ask.isPending : payInterest.isPending) ? 'Sending…' : `Pay interest only · ${fmt(interestLeft)}`}
+                      </button>
+                    )}
+                  </div>
+                )}
+                {today && (
+                  <div className="space-y-1 border-t border-border pt-4">
+                    <p className="font-semibold">If paid today, {formatDate(today.as_of)}</p>
+                    <p className="text-sm">Interest {fmt(today.interest_today)} · payment {fmt(today.payment_today)}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {today.days_from_due > 0
+                        ? `${today.days_from_due} days past ${formatDate(today.due_date)} adds ${fmt(today.interest_today - today.scheduled_interest)} to the scheduled ${fmt(today.scheduled_payment)}.`
+                        : today.days_from_due < 0
+                          ? `Paying today removes ${fmt(today.scheduled_payment - today.payment_today)} of interest from the ${fmt(today.scheduled_payment)} due ${formatDate(today.due_date)}.`
+                          : `Today is the due date, so this is the scheduled payment.`}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )
+          })()}
+
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="card-base p-4">
               <p className="text-xs text-muted-foreground">{loan.repayment_type === 'dated' ? 'Next payment' : 'Monthly Payment'}</p>
@@ -357,90 +441,6 @@ export function ActiveLoanDetail() {
               </div>
             </div>
           )}
-
-          {nextDue && loan.status !== 'completed' && (() => {
-            const open = (schedule ?? []).filter(row => !['paid', 'waived'].includes(row.status))
-            const today = quoteAsOfToday(open, loan.interest_rate ?? 0)
-            const interestLeft = today?.interest_today ?? 0
-            const principalLeft = today?.principal ?? open.reduce((sum, row) => sum + Math.max(0, row.principal_due - row.principal_paid), 0)
-            const last = open[open.length - 1]
-            const pendingExtension = asks?.find(row => row.kind === 'extension' && row.status === 'pending')
-            const pendingInterest = asks?.find(row => row.kind === 'interest_only' && row.status === 'pending')
-            const extraDays = extendDate && last
-              ? Math.round((Date.parse(`${extendDate}T00:00:00Z`) - Date.parse(`${last.due_date}T00:00:00Z`)) / 86400000)
-              : 0
-            const extra = extraDays > 0 ? Math.round(principalLeft * (loan.interest_rate ?? 0) * extraDays / 365) : 0
-            const instapay = loan.payment_channel === 'instapay'
-            return (
-              <div className="card-base p-5 space-y-5">
-                {today && (
-                  <div className="space-y-1">
-                    <p className="font-semibold">If paid today, {formatDate(today.as_of)}</p>
-                    <p className="text-sm">Interest {fmt(today.interest_today)} · payment {fmt(today.payment_today)}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {today.days_from_due > 0
-                        ? `${today.days_from_due} days past ${formatDate(today.due_date)} adds ${fmt(today.interest_today - today.scheduled_interest)} to the scheduled ${fmt(today.scheduled_payment)}.`
-                        : today.days_from_due < 0
-                          ? `Paying today removes ${fmt(today.scheduled_payment - today.payment_today)} of interest from the ${fmt(today.scheduled_payment)} due ${formatDate(today.due_date)}.`
-                          : `Today is the due date, so this is the scheduled payment.`}
-                    </p>
-                  </div>
-                )}
-                <div className="space-y-2">
-                  <p className="font-semibold">Request an extension</p>
-                  <p className="text-sm text-muted-foreground">
-                    The principal stays. Extra days add interest, and your lender confirms the new date.
-                    {last ? ` The current full payment is due ${formatDate(last.due_date)}.` : ''}
-                  </p>
-                  {pendingExtension ? (
-                    <p className="text-sm">Waiting for your lender to confirm {pendingExtension.requested_due_date ? formatDate(pendingExtension.requested_due_date) : 'the new date'}.</p>
-                  ) : (
-                    <>
-                      <input
-                        type="date"
-                        value={extendDate}
-                        min={last?.due_date}
-                        onChange={e => setExtendDate(e.target.value)}
-                        className="min-h-11 w-full border border-border bg-background px-3 text-sm"
-                      />
-                      {extraDays > 0 && (
-                        <p className="text-sm">{extraDays} more days adds {fmt(extra)} of interest.</p>
-                      )}
-                      <button
-                        type="button"
-                        disabled={ask.isPending || extraDays <= 0}
-                        onClick={() => ask.mutate({ kind: 'extension', due_date: extendDate })}
-                        className="min-h-11 rounded-lg border px-4 text-sm font-medium disabled:opacity-50"
-                      >
-                        {ask.isPending ? 'Sending…' : 'Request extension'}
-                      </button>
-                    </>
-                  )}
-                </div>
-                {interestLeft > 0 && (
-                  <div className="space-y-2 border-t border-border pt-4">
-                    <p className="font-semibold">Pay interest only</p>
-                    <p className="text-sm text-muted-foreground">
-                      Pay the interest calculated through today, {fmt(interestLeft)}. The principal of {fmt(principalLeft)} stays due {formatDate(nextDue.due_date)}.
-                      {instapay ? ' Your lender records it when the money arrives.' : ''}
-                    </p>
-                    {instapay && pendingInterest ? (
-                      <p className="text-sm">Waiting for your lender to record {fmt(pendingInterest.amount ?? interestLeft)}.</p>
-                    ) : (
-                      <button
-                        type="button"
-                        disabled={instapay ? ask.isPending : payInterest.isPending || (walletData?.available_balance ?? 0) < interestLeft}
-                        onClick={() => instapay ? ask.mutate({ kind: 'interest_only' }) : payInterest.mutate()}
-                        className="min-h-11 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-50"
-                      >
-                        {(instapay ? ask.isPending : payInterest.isPending) ? 'Sending…' : `Pay interest only · ${fmt(interestLeft)}`}
-                      </button>
-                    )}
-                  </div>
-                )}
-              </div>
-            )
-          })()}
 
           {loan.status === 'completed' && (
             <div className="rounded-lg border border-green-200 bg-green-50 p-6 text-center">
