@@ -6,6 +6,7 @@ import { StatusBadge } from '@/components/shared/StatusBadge'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { formatCents, formatDate, daysUntil, useCurrency } from '@/lib/utils'
 import { loanBalance, loanTitle, personName } from '@/lib/loan-label'
+import { BorrowerTotals } from './BorrowerTotals'
 import type { Loan } from '@lendflow/shared'
 
 interface BorrowerLoan extends Loan {
@@ -38,14 +39,16 @@ export function BorrowerDashboard() {
   const daysLeft = nextPayment?.nextDue ? daysUntil(nextPayment.nextDue) : null
 
   return (
-    <div className="max-w-4xl mx-auto space-y-7">
+    <div className="mx-auto max-w-4xl space-y-7 px-6 md:px-0">
       {/* Greeting */}
       <div>
         <h1 className="page-heading">Hi, {user?.name?.split(' ')[0]} 👋</h1>
         <p className="text-sm text-muted-foreground mt-1.5">
-          {loans?.length === 0 ? 'Ready to find a lender?' : `You have ${activeLoans.length} active loan${activeLoans.length !== 1 ? 's' : ''}`}
+          {loans?.length === 0 ? 'Ready to find a lender?' : 'What you still owe, what you have paid, and what is late.'}
         </p>
       </div>
+
+      {!!loans?.length && <BorrowerTotals loans={loans} />}
 
       {/* Next payment card */}
       {nextPayment && daysLeft !== null && (

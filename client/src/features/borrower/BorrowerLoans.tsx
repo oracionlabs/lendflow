@@ -5,6 +5,7 @@ import { formatCents, formatDate, formatPercent, useCurrency } from '@/lib/utils
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { CardSkeleton } from '@/components/shared/LoadingSkeleton'
 import { loanBalance, loanTitle, personName } from '@/lib/loan-label'
+import { BorrowerTotals } from './BorrowerTotals'
 import type { Loan } from '@lendflow/shared'
 import { ChevronRight, FileText } from 'lucide-react'
 
@@ -80,11 +81,13 @@ export function BorrowerLoans() {
   const past = loans?.filter(l => PAST_STATUSES.includes(l.status)) ?? []
 
   return (
-    <div className="max-w-4xl mx-auto space-y-7">
+    <div className="mx-auto max-w-4xl space-y-7 px-6 md:px-0">
       <div>
         <h1 className="page-heading">My Loans</h1>
         <p className="mt-1.5 text-sm text-muted-foreground">See applications, active balances, and completed loans.</p>
       </div>
+
+      {!!loans?.length && <BorrowerTotals loans={loans} />}
 
       {!loans?.length ? (
         <div className="text-center py-16 space-y-3">
