@@ -4,6 +4,7 @@ import api from '@/lib/api'
 import { useCurrency } from '@/lib/utils'
 import { CardSkeleton } from '@/components/shared/LoadingSkeleton'
 import { CommitmentCard, type DashboardLoan } from '@/features/lender/CommitmentCard'
+import { LenderCollections } from '@/features/lender/LenderCollections'
 import type { FundingCommitment } from '@lendflow/shared'
 import { TrendingUp } from 'lucide-react'
 
@@ -37,10 +38,12 @@ export function LenderLoans() {
 
   return (
     <div className="max-w-5xl mx-auto space-y-7">
-      <div>
+      <div className="px-6 md:px-0">
         <h1 className="page-heading">My Loans</h1>
-        <p className="mt-1.5 text-sm text-muted-foreground">Track balances, terms, and upcoming payments.</p>
+        <p className="mt-1.5 text-sm text-muted-foreground">What is due today, what is late, and what is coming up.</p>
       </div>
+
+      {!!active.length && <LenderCollections commitments={active} />}
 
       {!commitments?.length ? (
         <div className="text-center py-16 space-y-3">

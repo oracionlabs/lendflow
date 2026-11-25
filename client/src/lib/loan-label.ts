@@ -44,6 +44,15 @@ function addIsoDays(iso: string, days: number) {
   return date.toISOString().slice(0, 10)
 }
 
+export type CollectionBucket = 'overdue' | 'today' | 'upcoming'
+
+export function collectionBucket(due: string, today = manilaToday()): CollectionBucket | null {
+  if (due < today) return 'overdue'
+  if (due === today) return 'today'
+  if (due <= addIsoDays(today, 7)) return 'upcoming'
+  return null
+}
+
 export function borrowerSnapshot(loans: { status: string; currency?: string; loan_schedule?: ScheduleBit[] }[]) {
   const today = manilaToday()
   const soon = addIsoDays(today, 7)

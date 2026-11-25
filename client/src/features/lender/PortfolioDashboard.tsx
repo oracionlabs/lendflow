@@ -5,6 +5,7 @@ import { useAuth } from '@/context/AuthContext'
 import { formatCents, useCurrency } from '@/lib/utils'
 import { CardSkeleton } from '@/components/shared/LoadingSkeleton'
 import { CommitmentCard, type DashboardLoan } from '@/features/lender/CommitmentCard'
+import { LenderCollections } from '@/features/lender/LenderCollections'
 import type { FundingCommitment } from '@lendflow/shared'
 import { ChevronRight, Plus } from 'lucide-react'
 
@@ -93,7 +94,9 @@ export function PortfolioDashboard() {
         </div>
       </section>
 
-      <div className="flex items-end justify-between border-b border-foreground px-6 pb-2.5">
+      <LenderCollections commitments={openLoans} />
+
+      <div className="mt-[22px] flex items-end justify-between border-b border-foreground px-6 pb-2.5">
         <p className="caps">Your offers</p>
         <Link to="/lender/listing" className="inline-flex items-center gap-1 text-[13px] font-semibold text-accent">
           <Plus className="h-3.5 w-3.5" strokeWidth={1.75} /> New offer
