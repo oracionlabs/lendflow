@@ -8,7 +8,7 @@ interface BorrowerAsk {
   id: string
   loan_id: string
   commitment_id: string | null
-  kind: 'extension' | 'interest_only'
+  kind: 'extension' | 'interest_only' | 'pay_in_full'
   requested_due_date: string | null
   amount: number | null
   currency?: string
@@ -64,7 +64,9 @@ export function BorrowerRequests({ loanId }: { loanId?: string }) {
               <p className="text-[12.5px] text-muted-foreground">
                 {row.kind === 'extension'
                   ? `Extend the due date to ${row.requested_due_date ? formatDate(row.requested_due_date) : 'a later date'}. Extra interest ${formatCents(row.amount ?? 0, row.currency)}.`
-                  : `Record ${formatCents(row.amount ?? 0, row.currency)} of interest calculated through today. The principal stays on the schedule.`}
+                  : row.kind === 'pay_in_full'
+                    ? `Record the full payment of ${formatCents(row.amount ?? 0, row.currency)} calculated through today. This closes the loan.`
+                    : `Record ${formatCents(row.amount ?? 0, row.currency)} of interest calculated through today. The principal stays on the schedule.`}
               </p>
             </div>
             <div className="flex gap-3">

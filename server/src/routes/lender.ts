@@ -1035,7 +1035,7 @@ router.post('/borrower-requests/:id/decide', async (req: Request, res: Response)
     await createNotification({
       user_id: request.borrower_id,
       type: 'system',
-      title: request.kind === 'extension' ? 'Extension declined' : 'Interest payment declined',
+      title: request.kind === 'extension' ? 'Extension declined' : request.kind === 'pay_in_full' ? 'Full payment declined' : 'Interest payment declined',
       body: 'Your lender did not accept this request.',
       link: `/borrower/loans/${request.loan_id}`,
     }).catch(() => undefined)
@@ -1093,6 +1093,59 @@ router.post('/borrower-requests/:id/decide', async (req: Request, res: Response)
     await db.from('funding_commitments').update({
       expected_yield: (commitment.expected_yield ?? 0) + extraInterest,
     }).eq('id', commitment.id)
+  } else if (request.kind === 'pay_in_full') {
+    const aligned = applyTodayInterest(open, Number(loan.interest_rate))
+    const rows = aligned?.rows ?? open
+    const interestDelta = aligned ? aligned.quote.interest_today - aligned.quote.scheduled_interest : 0
+    for (const row of rows) {
+      const before = open.find(item => item.id === row.id)
+      if (!before || before.interest_due === row.interest_due) continue
+      const { error } = await db.from('loan_schedule').update({
+        interest_due: row.interest_due,
+        total_due: row.total_due,
+      }).eq('id', row.id)
+      if (error) { res.status(500).json({ error: error.message }); return }
+    }
+    if (interestDelta !== 0) {
+      await db.from('loans').update({
+        total_repayment: Math.max(0, (loan.total_repayment ?? 0) + interestDelta),
+      }).eq('id', request.loan_id)
+      await db.from('funding_commitments').update({
+        expected_yield: Math.max(0, (commitment.expected_yield ?? 0) + interestDelta),
+      }).eq('id', commitment.id)
+    }
+    const now = new Date().toISOString()
+    let interestRecorded = 0
+    for (const row of rows) {
+      const owed = Math.max(0, row.total_due - (row.total_paid ?? 0))
+      if (owed <= 0) continue
+      const interestPortion = Math.min(Math.max(0, row.interest_due - (row.interest_paid ?? 0)), owed)
+      const principalPortion = Math.min(Math.max(0, row.principal_due - (row.principal_paid ?? 0)), owed - interestPortion)
+      const apply = interestPortion + principalPortion
+      if (apply <= 0) continue
+      const { error } = await db.from('loan_schedule').update({
+        status: 'paid',
+        principal_paid: (row.principal_paid ?? 0) + principalPortion,
+        interest_paid: (row.interest_paid ?? 0) + interestPortion,
+        total_paid: (row.total_paid ?? 0) + apply,
+        paid_at: now,
+        payment_note: 'Paid in full',
+      }).eq('id', row.id)
+      if (error) { res.status(500).json({ error: error.message }); return }
+      await db.from('yield_distributions').insert({
+        commitment_id: commitment.id,
+        schedule_id: row.id,
+        principal_return: principalPortion,
+        interest_return: interestPortion,
+        total_return: apply,
+      })
+      interestRecorded += interestPortion
+    }
+    await db.from('funding_commitments').update({
+      actual_yield: (commitment.actual_yield ?? 0) + interestRecorded,
+      status: 'completed',
+    }).eq('id', commitment.id)
+    await db.from('loans').update({ status: 'completed' }).eq('id', request.loan_id)
   } else {
     const aligned = applyTodayInterest(open, Number(loan.interest_rate))
     if (!aligned || aligned.quote.interest_today <= 0) {
@@ -1159,10 +1212,12 @@ router.post('/borrower-requests/:id/decide', async (req: Request, res: Response)
   await createNotification({
     user_id: request.borrower_id,
     type: 'system',
-    title: request.kind === 'extension' ? 'Extension accepted' : 'Interest payment recorded',
+    title: request.kind === 'extension' ? 'Extension accepted' : request.kind === 'pay_in_full' ? 'Paid in full' : 'Interest payment recorded',
     body: request.kind === 'extension'
       ? 'Your lender moved the due date. The extra interest is on the schedule.'
-      : 'Your lender recorded the interest. The principal is still due.',
+      : request.kind === 'pay_in_full'
+        ? 'Your lender recorded the full payment calculated through today.'
+        : 'Your lender recorded the interest. The principal is still due.',
     link: `/borrower/loans/${request.loan_id}`,
   }).catch(() => undefined)
   res.json({ success: true, status: 'accepted' })

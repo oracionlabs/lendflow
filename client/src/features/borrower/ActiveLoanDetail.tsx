@@ -41,6 +41,7 @@ export function ActiveLoanDetail() {
   const [extendDate, setExtendDate] = useState('')
   const [showExtend, setShowExtend] = useState(false)
   const [showPay, setShowPay] = useState(false)
+  const [showPayFull, setShowPayFull] = useState(false)
 
   const { data: loanPayload, isLoading: loanLoading } = useQuery({
     queryKey: ['loan', id],
@@ -109,20 +110,21 @@ export function ActiveLoanDetail() {
   const { data: asks } = useQuery({
     queryKey: ['loan-requests', id],
     queryFn: async () => {
-      const { data } = await api.get<{ requests: Array<{ id: string; kind: 'extension' | 'interest_only'; requested_due_date: string | null; amount: number | null; status: string }> }>(`/api/loans/${id}/requests`)
+      const { data } = await api.get<{ requests: Array<{ id: string; kind: 'extension' | 'interest_only' | 'pay_in_full'; requested_due_date: string | null; amount: number | null; status: string }> }>(`/api/loans/${id}/requests`)
       return data.requests ?? []
     },
     enabled: !!loanData && ['active', 'repaying'].includes(loanData.status),
   })
 
   const ask = useMutation({
-    mutationFn: (body: { kind: 'extension' | 'interest_only'; due_date?: string }) =>
+    mutationFn: (body: { kind: 'extension' | 'interest_only' | 'pay_in_full'; due_date?: string }) =>
       api.post(`/api/loans/${id}/requests`, body),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['loan-requests', id] })
       setExtendDate('')
       setShowExtend(false)
       setShowPay(false)
+      setShowPayFull(false)
       toast.success('Sent to your lender')
     },
     onError: (err: unknown) => {
@@ -137,6 +139,20 @@ export function ActiveLoanDetail() {
       qc.invalidateQueries({ queryKey: ['wallet'] })
       setShowPay(false)
       toast.success('Interest paid. The principal stays on the schedule.')
+    },
+    onError: (err: unknown) => {
+      toast.error((err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Payment failed')
+    },
+  })
+
+  const payFull = useMutation({
+    mutationFn: () => api.post(`/api/loans/${id}/payments`, { pay_in_full: true }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['loan', id] })
+      qc.invalidateQueries({ queryKey: ['loan-schedule', id] })
+      qc.invalidateQueries({ queryKey: ['wallet'] })
+      setShowPayFull(false)
+      toast.success('Paid in full.')
     },
     onError: (err: unknown) => {
       toast.error((err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Payment failed')
@@ -251,6 +267,8 @@ export function ActiveLoanDetail() {
             const last = open[open.length - 1]
             const pendingExtension = asks?.find(row => row.kind === 'extension' && row.status === 'pending')
             const pendingInterest = asks?.find(row => row.kind === 'interest_only' && row.status === 'pending')
+            const pendingFull = asks?.find(row => row.kind === 'pay_in_full' && row.status === 'pending')
+            const fullAmount = today?.payment_today ?? 0
             const extraDays = extendDate && last
               ? Math.round((Date.parse(`${extendDate}T00:00:00Z`) - Date.parse(`${last.due_date}T00:00:00Z`)) / 86400000)
               : 0
@@ -272,6 +290,13 @@ export function ActiveLoanDetail() {
                     ) : (
                       <button type="button" onClick={() => setShowPay(true)} className="button-primary px-4">
                         Pay Now - {fmt(interestLeft)} only
+                      </button>
+                    ))}
+                    {fullAmount > 0 && (instapay && pendingFull ? (
+                      <p className="text-sm">Waiting for your lender to record the full payment of {fmt(pendingFull.amount ?? fullAmount)}.</p>
+                    ) : (
+                      <button type="button" onClick={() => setShowPayFull(true)} className="min-h-11 rounded-lg border px-4 text-sm font-medium">
+                        Pay in full - {fmt(fullAmount)}
                       </button>
                     ))}
                   </div>
@@ -315,6 +340,40 @@ export function ActiveLoanDetail() {
                           className="button-primary flex-1"
                         >
                           {ask.isPending ? 'Sending…' : 'Request extension'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {showPayFull && fullAmount > 0 && (
+                  <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#1B2233]/40 p-4 sm:items-center" role="presentation" onClick={() => setShowPayFull(false)}>
+                    <div role="dialog" aria-modal="true" aria-labelledby="pay-full-title" className="w-full max-w-sm border border-border bg-card p-6" onClick={event => event.stopPropagation()}>
+                      <h2 id="pay-full-title" className="font-serif text-[27px] leading-tight tracking-tight">Pay in full</h2>
+                      <p className="caps mt-6">Payment if today</p>
+                      <p className="num mt-2 text-[44px] leading-none">{fmt(fullAmount)}</p>
+                      <dl className="mt-5 grid grid-cols-2 gap-4 border-t border-border pt-4">
+                        <div>
+                          <dt className="text-xs text-muted-foreground">Principal</dt>
+                          <dd className="num mt-1 text-xl">{fmt(principalLeft)}</dd>
+                        </div>
+                        <div>
+                          <dt className="text-xs text-muted-foreground">Interest</dt>
+                          <dd className="num mt-1 text-xl">{fmt(interestLeft)}</dd>
+                        </div>
+                      </dl>
+                      <p className="mt-3 text-[13.5px] text-muted-foreground">
+                        This closes the loan at the amount calculated through today.
+                        {instapay ? ' Your lender records it when the money arrives.' : ''}
+                      </p>
+                      <div className="mt-6 flex items-center gap-4">
+                        <button type="button" onClick={() => setShowPayFull(false)} className="min-h-12 px-1.5 text-sm font-semibold">Cancel</button>
+                        <button
+                          type="button"
+                          disabled={instapay ? ask.isPending : payFull.isPending || (!instapay && (walletData?.available_balance ?? 0) < fullAmount)}
+                          onClick={() => instapay ? ask.mutate({ kind: 'pay_in_full' }) : payFull.mutate()}
+                          className="button-primary flex-1"
+                        >
+                          {(instapay ? ask.isPending : payFull.isPending) ? 'Sending…' : `Pay in full - ${fmt(fullAmount)}`}
                         </button>
                       </div>
                     </div>

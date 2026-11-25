@@ -451,9 +451,9 @@ router.get('/:id/requests', requireBorrower, async (req: Request, res: Response)
 
 router.post('/:id/requests', requireBorrower, async (req: Request, res: Response): Promise<void> => {
   const user = res.locals.user
-  const { kind, due_date } = req.body as { kind?: 'extension' | 'interest_only'; due_date?: string }
-  if (kind !== 'extension' && kind !== 'interest_only') {
-    res.status(400).json({ error: 'Choose an extension or an interest-only payment' })
+  const { kind, due_date } = req.body as { kind?: 'extension' | 'interest_only' | 'pay_in_full'; due_date?: string }
+  if (kind !== 'extension' && kind !== 'interest_only' && kind !== 'pay_in_full') {
+    res.status(400).json({ error: 'Choose an extension, an interest-only payment, or pay in full' })
     return
   }
   if (kind === 'extension' && (!due_date || !/^\d{4}-\d{2}-\d{2}$/.test(due_date))) {
@@ -499,6 +499,12 @@ router.post('/:id/requests', requireBorrower, async (req: Request, res: Response
     const principal = open.reduce((sum, row) => sum + Math.max(0, row.principal_due - (row.principal_paid ?? 0)), 0)
     amount = Math.round(principal * Number(loan.interest_rate) * extraDays / 365)
     requestedDue = due_date ?? null
+  } else if (kind === 'pay_in_full') {
+    amount = todayQuote?.payment_today ?? 0
+    if (amount <= 0) {
+      res.status(400).json({ error: 'This loan is already paid' })
+      return
+    }
   } else if (interestLeft <= 0) {
     res.status(400).json({ error: 'No interest is left on this loan' })
     return
@@ -537,10 +543,12 @@ router.post('/:id/requests', requireBorrower, async (req: Request, res: Response
     await createNotification({
       user_id: commitment.lender_id,
       type: 'system',
-      title: kind === 'extension' ? 'Extension requested' : 'Interest-only payment',
+      title: kind === 'extension' ? 'Extension requested' : kind === 'pay_in_full' ? 'Pay in full' : 'Interest-only payment',
       body: kind === 'extension'
         ? 'A borrower asked to move a due date.'
-        : 'A borrower asked you to record an interest-only payment.',
+        : kind === 'pay_in_full'
+          ? 'A borrower asked you to record the full payment calculated through today.'
+          : 'A borrower asked you to record an interest-only payment.',
       link: `/lender/commitments/${commitment.id}`,
     }).catch(() => undefined)
   }
