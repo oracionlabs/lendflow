@@ -61,6 +61,75 @@ export function quoteAdvance(
   }
 }
 
+export interface TodayQuote {
+  as_of: string
+  due_date: string
+  days_from_due: number
+  principal: number
+  interest_today: number
+  payment_today: number
+  scheduled_interest: number
+  scheduled_payment: number
+}
+
+/** Interest and full payment if the loan is settled on `asOf` (Manila today by default). */
+export function quoteAsOfToday(
+  schedule: AdvanceScheduleRow[],
+  annualRate: number,
+  asOf = manilaToday(),
+): TodayQuote | null {
+  const base = quoteAdvance(schedule, annualRate, asOf)
+  if (!base) return null
+  const daysFromDue = daysBetween(base.due_date, base.as_of)
+  const rate = Number.isFinite(annualRate) ? Math.max(0, annualRate) : 0
+  const lateInterest = daysFromDue > 0
+    ? Math.round(base.remaining_principal * rate * daysFromDue / 365)
+    : 0
+  const interest = daysFromDue > 0 ? base.unpaid_interest + lateInterest : base.interest_due_today
+  return {
+    as_of: base.as_of,
+    due_date: base.due_date,
+    days_from_due: daysFromDue,
+    principal: base.remaining_principal,
+    interest_today: interest,
+    payment_today: base.remaining_principal + interest,
+    scheduled_interest: base.unpaid_interest,
+    scheduled_payment: base.scheduled_amount,
+  }
+}
+
+/** Returns a copy of the schedule whose open interest matches `quoteAsOfToday`. */
+export function applyTodayInterest<T extends AdvanceScheduleRow>(
+  schedule: T[],
+  annualRate: number,
+  asOf = manilaToday(),
+): { quote: TodayQuote; rows: T[] } | null {
+  const quote = quoteAsOfToday(schedule, annualRate, asOf)
+  if (!quote) return null
+  const rows = schedule.map(row => ({ ...row }))
+  let delta = quote.interest_today - quote.scheduled_interest
+  const openIdx = rows
+    .map((row, index) => ({ row, index }))
+    .filter(({ row }) => !['paid', 'waived'].includes(row.status) && row.total_due - (row.total_paid ?? 0) > 0)
+    .map(({ index }) => index)
+  if (!openIdx.length || delta === 0) return { quote, rows }
+  if (delta > 0) {
+    const row = rows[openIdx[openIdx.length - 1]]
+    row.interest_due += delta
+    row.total_due += delta
+    return { quote, rows }
+  }
+  for (let i = openIdx.length - 1; i >= 0 && delta < 0; i--) {
+    const row = rows[openIdx[i]]
+    const room = Math.max(0, row.interest_due - (row.interest_paid ?? 0))
+    const cut = Math.min(room, -delta)
+    row.interest_due -= cut
+    row.total_due -= cut
+    delta += cut
+  }
+  return { quote, rows }
+}
+
 export function partialAdvanceSavings(
   schedule: AdvanceScheduleRow[],
   annualRate: number,

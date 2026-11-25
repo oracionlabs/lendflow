@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express'
 import { supabaseAdmin } from '../lib/supabase'
 import { assessCredit } from '../lib/credit-assessment'
 import { ensureLoanAccess } from '../lib/loan-access'
-import { partialAdvanceSavings, quoteAdvance } from '@lendflow/shared'
+import { applyTodayInterest, partialAdvanceSavings, quoteAdvance } from '@lendflow/shared'
 import { createNotification } from '../lib/notifications'
 
 function reduceScheduleInterest(
@@ -1094,9 +1094,32 @@ router.post('/borrower-requests/:id/decide', async (req: Request, res: Response)
       expected_yield: (commitment.expected_yield ?? 0) + extraInterest,
     }).eq('id', commitment.id)
   } else {
+    const aligned = applyTodayInterest(open, Number(loan.interest_rate))
+    if (!aligned || aligned.quote.interest_today <= 0) {
+      res.status(400).json({ error: 'No interest is left on this loan' })
+      return
+    }
+    const interestDelta = aligned.quote.interest_today - aligned.quote.scheduled_interest
+    for (const row of aligned.rows) {
+      const before = open.find(item => item.id === row.id)
+      if (!before || before.interest_due === row.interest_due) continue
+      const { error } = await db.from('loan_schedule').update({
+        interest_due: row.interest_due,
+        total_due: row.total_due,
+      }).eq('id', row.id)
+      if (error) { res.status(500).json({ error: error.message }); return }
+    }
+    if (interestDelta !== 0) {
+      await db.from('loans').update({
+        total_repayment: Math.max(0, (loan.total_repayment ?? 0) + interestDelta),
+      }).eq('id', request.loan_id)
+      await db.from('funding_commitments').update({
+        expected_yield: Math.max(0, (commitment.expected_yield ?? 0) + interestDelta),
+      }).eq('id', commitment.id)
+    }
     const now = new Date().toISOString()
     let interestRecorded = 0
-    for (const row of open) {
+    for (const row of aligned.rows) {
       const interestOwed = Math.max(0, row.interest_due - (row.interest_paid ?? 0))
       if (interestOwed <= 0) continue
       const totalPaid = (row.total_paid ?? 0) + interestOwed

@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express'
 import { supabaseAdmin } from '../lib/supabase'
-import { quoteAdvance } from '@lendflow/shared'
+import { applyTodayInterest, quoteAdvance } from '@lendflow/shared'
 
 function reduceScheduleInterest(
   rows: Array<{ interest_due: number; interest_paid?: number | null; total_due: number }>,
@@ -58,7 +58,7 @@ router.post('/:loanId/payments', async (req: Request, res: Response): Promise<vo
     const db = supabaseAdmin()
     const { data: loan } = await db
       .from('loans')
-      .select('borrower_id, status, payment_channel')
+      .select('borrower_id, status, payment_channel, interest_rate, total_repayment')
       .eq('id', req.params.loanId)
       .single()
     if (!loan || loan.borrower_id !== user.id) { res.status(404).json({ error: 'Loan not found' }); return }
@@ -74,8 +74,23 @@ router.post('/:loanId/payments', async (req: Request, res: Response): Promise<vo
       .eq('loan_id', req.params.loanId)
       .order('installment_number', { ascending: true })
     const open = (schedule ?? []).filter(row => !['paid', 'waived'].includes(row.status))
-    const interestLeft = open.reduce((sum, row) => sum + Math.max(0, row.interest_due - (row.interest_paid ?? 0)), 0)
-    if (interestLeft <= 0) { res.status(400).json({ error: 'No interest is left on this loan' }); return }
+    const aligned = applyTodayInterest(open, Number(loan.interest_rate ?? 0))
+    if (!aligned || aligned.quote.interest_today <= 0) { res.status(400).json({ error: 'No interest is left on this loan' }); return }
+    const interestLeft = aligned.quote.interest_today
+    const interestDelta = aligned.quote.interest_today - aligned.quote.scheduled_interest
+    for (const row of aligned.rows) {
+      const before = open.find(item => item.id === row.id)
+      if (!before || before.interest_due === row.interest_due) continue
+      await db.from('loan_schedule').update({
+        interest_due: row.interest_due,
+        total_due: row.total_due,
+      }).eq('id', row.id)
+    }
+    if (interestDelta !== 0) {
+      await db.from('loans').update({
+        total_repayment: Math.max(0, (loan.total_repayment ?? 0) + interestDelta),
+      }).eq('id', req.params.loanId)
+    }
     const { data: wallet } = await db.from('wallets').select('id, available_balance').eq('user_id', user.id).single()
     if (!wallet || wallet.available_balance < interestLeft) {
       res.status(400).json({ error: 'Insufficient wallet balance' }); return
@@ -95,9 +110,9 @@ router.post('/:loanId/payments', async (req: Request, res: Response): Promise<vo
     })
     const { data: commits } = await db
       .from('funding_commitments')
-      .select('id, lender_id, share_percent, actual_yield')
+      .select('id, lender_id, share_percent, actual_yield, expected_yield')
       .eq('loan_id', req.params.loanId)
-    for (const row of open) {
+    for (const row of aligned.rows) {
       const interestOwed = Math.max(0, row.interest_due - (row.interest_paid ?? 0))
       if (interestOwed <= 0) continue
       const totalPaid = (row.total_paid ?? 0) + interestOwed
@@ -130,11 +145,12 @@ router.post('/:loanId/payments', async (req: Request, res: Response): Promise<vo
       }
       await db.from('funding_commitments').update({
         actual_yield: (commit.actual_yield ?? 0) + share,
+        expected_yield: Math.max(0, (commit.expected_yield ?? 0) + Math.round(interestDelta * Number(commit.share_percent ?? 100) / 100)),
         status: 'repaying',
       }).eq('id', commit.id)
       await db.from('yield_distributions').insert({
         commitment_id: commit.id,
-        schedule_id: open[0]?.id,
+        schedule_id: aligned.rows[0]?.id,
         principal_return: 0,
         interest_return: share,
         total_return: share,

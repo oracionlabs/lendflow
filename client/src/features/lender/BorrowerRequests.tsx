@@ -64,7 +64,7 @@ export function BorrowerRequests({ loanId }: { loanId?: string }) {
               <p className="text-[12.5px] text-muted-foreground">
                 {row.kind === 'extension'
                   ? `Extend the due date to ${row.requested_due_date ? formatDate(row.requested_due_date) : 'a later date'}. Extra interest ${formatCents(row.amount ?? 0, row.currency)}.`
-                  : `Record an interest-only payment of ${formatCents(row.amount ?? 0, row.currency)}. The principal stays on the schedule.`}
+                  : `Record ${formatCents(row.amount ?? 0, row.currency)} of interest calculated through today. The principal stays on the schedule.`}
               </p>
             </div>
             <div className="flex gap-3">

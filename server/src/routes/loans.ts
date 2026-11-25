@@ -3,7 +3,7 @@ import { supabaseAdmin } from '../lib/supabase'
 import { requireBorrower } from '../middleware/requireRole'
 import { assessCredit } from '../lib/credit-assessment'
 import { previewMonthlyPayment } from '../lib/amortization'
-import { quoteAdvance } from '@lendflow/shared'
+import { quoteAdvance, quoteAsOfToday } from '@lendflow/shared'
 import { createNotification } from '../lib/notifications'
 import { CREDIT_GRADE_RATES } from '@lendflow/shared'
 import type { User } from '@lendflow/shared'
@@ -485,7 +485,8 @@ router.post('/:id/requests', requireBorrower, async (req: Request, res: Response
   const open = (schedule ?? []).filter(row => !['paid', 'waived'].includes(row.status))
   if (!open.length) { res.status(400).json({ error: 'This loan is already paid' }); return }
 
-  const interestLeft = open.reduce((sum, row) => sum + Math.max(0, row.interest_due - (row.interest_paid ?? 0)), 0)
+  const todayQuote = quoteAsOfToday(open, Number(loan.interest_rate))
+  const interestLeft = todayQuote?.interest_today ?? 0
   let amount = interestLeft
   let requestedDue = due_date ?? null
   if (kind === 'extension') {

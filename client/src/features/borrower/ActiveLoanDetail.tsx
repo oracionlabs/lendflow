@@ -8,7 +8,7 @@ import { CreditGradeBadge } from '@/components/shared/CreditGradeBadge'
 import { TableSkeleton } from '@/components/shared/LoadingSkeleton'
 import { toast } from 'sonner'
 import type { Loan, LoanScheduleItem } from '@lendflow/shared'
-import { quoteAdvance } from '@lendflow/shared'
+import { quoteAdvance, quoteAsOfToday } from '@lendflow/shared'
 import { loanTitle } from '@/lib/loan-label'
 import { CheckCircle, Clock, AlertCircle, XCircle } from 'lucide-react'
 
@@ -360,8 +360,9 @@ export function ActiveLoanDetail() {
 
           {nextDue && loan.status !== 'completed' && (() => {
             const open = (schedule ?? []).filter(row => !['paid', 'waived'].includes(row.status))
-            const interestLeft = open.reduce((sum, row) => sum + Math.max(0, row.interest_due - row.interest_paid), 0)
-            const principalLeft = open.reduce((sum, row) => sum + Math.max(0, row.principal_due - row.principal_paid), 0)
+            const today = quoteAsOfToday(open, loan.interest_rate ?? 0)
+            const interestLeft = today?.interest_today ?? 0
+            const principalLeft = today?.principal ?? open.reduce((sum, row) => sum + Math.max(0, row.principal_due - row.principal_paid), 0)
             const last = open[open.length - 1]
             const pendingExtension = asks?.find(row => row.kind === 'extension' && row.status === 'pending')
             const pendingInterest = asks?.find(row => row.kind === 'interest_only' && row.status === 'pending')
@@ -372,6 +373,19 @@ export function ActiveLoanDetail() {
             const instapay = loan.payment_channel === 'instapay'
             return (
               <div className="card-base p-5 space-y-5">
+                {today && (
+                  <div className="space-y-1">
+                    <p className="font-semibold">If paid today, {formatDate(today.as_of)}</p>
+                    <p className="text-sm">Interest {fmt(today.interest_today)} · payment {fmt(today.payment_today)}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {today.days_from_due > 0
+                        ? `${today.days_from_due} days past ${formatDate(today.due_date)} adds ${fmt(today.interest_today - today.scheduled_interest)} to the scheduled ${fmt(today.scheduled_payment)}.`
+                        : today.days_from_due < 0
+                          ? `Paying today removes ${fmt(today.scheduled_payment - today.payment_today)} of interest from the ${fmt(today.scheduled_payment)} due ${formatDate(today.due_date)}.`
+                          : `Today is the due date, so this is the scheduled payment.`}
+                    </p>
+                  </div>
+                )}
                 <div className="space-y-2">
                   <p className="font-semibold">Request an extension</p>
                   <p className="text-sm text-muted-foreground">
@@ -407,7 +421,7 @@ export function ActiveLoanDetail() {
                   <div className="space-y-2 border-t border-border pt-4">
                     <p className="font-semibold">Pay interest only</p>
                     <p className="text-sm text-muted-foreground">
-                      Pay {fmt(interestLeft)} and the principal of {fmt(principalLeft)} stays due {formatDate(nextDue.due_date)}.
+                      Pay the interest calculated through today, {fmt(interestLeft)}. The principal of {fmt(principalLeft)} stays due {formatDate(nextDue.due_date)}.
                       {instapay ? ' Your lender records it when the money arrives.' : ''}
                     </p>
                     {instapay && pendingInterest ? (
