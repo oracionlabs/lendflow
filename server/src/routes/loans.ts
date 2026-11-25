@@ -456,7 +456,7 @@ router.post('/:id/requests', requireBorrower, async (req: Request, res: Response
     res.status(400).json({ error: 'Choose an extension, an interest-only payment, or pay in full' })
     return
   }
-  if (kind === 'extension' && (!due_date || !/^\d{4}-\d{2}-\d{2}$/.test(due_date))) {
+  if ((kind === 'extension' || kind === 'interest_only') && (!due_date || !/^\d{4}-\d{2}-\d{2}$/.test(due_date))) {
     res.status(400).json({ error: 'Choose a new due date' })
     return
   }
@@ -505,9 +505,19 @@ router.post('/:id/requests', requireBorrower, async (req: Request, res: Response
       res.status(400).json({ error: 'This loan is already paid' })
       return
     }
-  } else if (interestLeft <= 0) {
-    res.status(400).json({ error: 'No interest is left on this loan' })
-    return
+  } else if (kind === 'interest_only') {
+    if (interestLeft <= 0) {
+      res.status(400).json({ error: 'No interest is left on this loan' })
+      return
+    }
+    const last = open[open.length - 1]
+    const extraDays = Math.round((Date.parse(`${due_date}T00:00:00Z`) - Date.parse(`${last.due_date}T00:00:00Z`)) / 86400000)
+    if (extraDays <= 0) {
+      res.status(400).json({ error: 'The new due date has to be after the current due date' })
+      return
+    }
+    amount = interestLeft
+    requestedDue = due_date ?? null
   }
 
   const { data: existing } = await db
@@ -548,7 +558,7 @@ router.post('/:id/requests', requireBorrower, async (req: Request, res: Response
         ? 'A borrower asked to move a due date.'
         : kind === 'pay_in_full'
           ? 'A borrower asked you to record the full payment calculated through today.'
-          : 'A borrower asked you to record an interest-only payment.',
+          : 'A borrower asked you to record the interest and move the principal due date.',
       link: `/lender/commitments/${commitment.id}`,
     }).catch(() => undefined)
   }

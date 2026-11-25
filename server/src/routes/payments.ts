@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express'
 import { supabaseAdmin } from '../lib/supabase'
 import { applyTodayInterest, quoteAdvance } from '@lendflow/shared'
+import { planInterestRoll } from '../lib/roll-due'
 
 function reduceScheduleInterest(
   rows: Array<{ interest_due: number; interest_paid?: number | null; total_due: number }>,
@@ -47,12 +48,13 @@ router.get('/:loanId/payments', async (req: Request, res: Response): Promise<voi
 
 router.post('/:loanId/payments', async (req: Request, res: Response): Promise<void> => {
   const user = res.locals.user
-  const { schedule_id, amount, advance, interest_only, pay_in_full } = req.body as {
+  const { schedule_id, amount, advance, interest_only, pay_in_full, due_date } = req.body as {
     schedule_id: string
     amount: number
     advance?: boolean
     interest_only?: boolean
     pay_in_full?: boolean
+    due_date?: string
   }
 
   if (pay_in_full) {
@@ -167,6 +169,9 @@ router.post('/:loanId/payments', async (req: Request, res: Response): Promise<vo
     if (loan.payment_channel === 'instapay') {
       res.status(400).json({ error: 'Ask your lender to record an interest-only payment' }); return
     }
+    if (!due_date || !/^\d{4}-\d{2}-\d{2}$/.test(due_date)) {
+      res.status(400).json({ error: 'Choose a new due date' }); return
+    }
     const { data: schedule } = await db
       .from('loan_schedule')
       .select('*')
@@ -185,11 +190,6 @@ router.post('/:loanId/payments', async (req: Request, res: Response): Promise<vo
         total_due: row.total_due,
       }).eq('id', row.id)
     }
-    if (interestDelta !== 0) {
-      await db.from('loans').update({
-        total_repayment: Math.max(0, (loan.total_repayment ?? 0) + interestDelta),
-      }).eq('id', req.params.loanId)
-    }
     const { data: wallet } = await db.from('wallets').select('id, available_balance').eq('user_id', user.id).single()
     if (!wallet || wallet.available_balance < interestLeft) {
       res.status(400).json({ error: 'Insufficient wallet balance' }); return
@@ -205,7 +205,7 @@ router.post('/:loanId/payments', async (req: Request, res: Response): Promise<vo
       amount: -interestLeft,
       balance_after: wallet.available_balance - interestLeft,
       related_loan_id: req.params.loanId,
-      description: 'Interest-only payment',
+      description: 'Interest payment',
     })
     const { data: commits } = await db
       .from('funding_commitments')
@@ -221,6 +221,22 @@ router.post('/:loanId/payments', async (req: Request, res: Response): Promise<vo
         total_paid: totalPaid,
         paid_at: new Date().toISOString(),
         payment_note: 'Interest only',
+      }).eq('id', row.id)
+    }
+    const { data: afterPay } = await db
+      .from('loan_schedule')
+      .select('*')
+      .eq('loan_id', req.params.loanId)
+      .order('installment_number', { ascending: true })
+    const roll = planInterestRoll((afterPay ?? []).filter(row => !['paid', 'waived'].includes(row.status)), due_date, Number(loan.interest_rate ?? 0))
+    if ('error' in roll) {
+      res.status(400).json({ error: roll.error }); return
+    }
+    for (const row of roll.updates) {
+      await db.from('loan_schedule').update({
+        due_date: row.due_date,
+        interest_due: row.interest_due,
+        total_due: row.total_due,
       }).eq('id', row.id)
     }
     for (const commit of commits ?? []) {
@@ -239,12 +255,12 @@ router.post('/:loanId/payments', async (req: Request, res: Response): Promise<vo
           balance_after: lenderWallet.available_balance + share,
           related_loan_id: req.params.loanId,
           related_commitment_id: commit.id,
-          description: 'Interest-only payment',
+          description: 'Interest payment',
         })
       }
       await db.from('funding_commitments').update({
         actual_yield: (commit.actual_yield ?? 0) + share,
-        expected_yield: Math.max(0, (commit.expected_yield ?? 0) + Math.round(interestDelta * Number(commit.share_percent ?? 100) / 100)),
+        expected_yield: Math.max(0, (commit.expected_yield ?? 0) + Math.round((interestDelta + roll.newInterest) * Number(commit.share_percent ?? 100) / 100)),
         status: 'repaying',
       }).eq('id', commit.id)
       await db.from('yield_distributions').insert({
@@ -255,8 +271,12 @@ router.post('/:loanId/payments', async (req: Request, res: Response): Promise<vo
         total_return: share,
       })
     }
-    await db.from('loans').update({ status: 'repaying' }).eq('id', req.params.loanId)
-    res.json({ total_paid: interestLeft, interest_only: true })
+    await db.from('loans').update({
+      status: 'repaying',
+      maturity_date: roll.maturity,
+      total_repayment: Math.max(0, (loan.total_repayment ?? 0) + interestDelta + roll.newInterest),
+    }).eq('id', req.params.loanId)
+    res.json({ total_paid: interestLeft, interest_only: true, new_due_date: roll.maturity })
     return
   }
 

@@ -4,6 +4,7 @@ import { assessCredit } from '../lib/credit-assessment'
 import { ensureLoanAccess } from '../lib/loan-access'
 import { applyTodayInterest, partialAdvanceSavings, quoteAdvance } from '@lendflow/shared'
 import { createNotification } from '../lib/notifications'
+import { planInterestRoll } from '../lib/roll-due'
 
 function reduceScheduleInterest(
   rows: Array<{ interest_due: number; interest_paid?: number | null; total_due: number }>,
@@ -1162,14 +1163,6 @@ router.post('/borrower-requests/:id/decide', async (req: Request, res: Response)
       }).eq('id', row.id)
       if (error) { res.status(500).json({ error: error.message }); return }
     }
-    if (interestDelta !== 0) {
-      await db.from('loans').update({
-        total_repayment: Math.max(0, (loan.total_repayment ?? 0) + interestDelta),
-      }).eq('id', request.loan_id)
-      await db.from('funding_commitments').update({
-        expected_yield: Math.max(0, (commitment.expected_yield ?? 0) + interestDelta),
-      }).eq('id', commitment.id)
-    }
     const now = new Date().toISOString()
     let interestRecorded = 0
     for (const row of aligned.rows) {
@@ -1198,11 +1191,39 @@ router.post('/borrower-requests/:id/decide', async (req: Request, res: Response)
       res.status(400).json({ error: 'No interest is left on this loan' })
       return
     }
+    const due = request.requested_due_date
+    if (!due) {
+      res.status(400).json({ error: 'This request has no new due date' })
+      return
+    }
+    const { data: afterPay } = await db
+      .from('loan_schedule')
+      .select('*')
+      .eq('loan_id', request.loan_id)
+      .order('installment_number', { ascending: true })
+    const roll = planInterestRoll((afterPay ?? []).filter(row => !['paid', 'waived'].includes(row.status)), due, Number(loan.interest_rate))
+    if ('error' in roll) {
+      res.status(400).json({ error: roll.error })
+      return
+    }
+    for (const row of roll.updates) {
+      const { error } = await db.from('loan_schedule').update({
+        due_date: row.due_date,
+        interest_due: row.interest_due,
+        total_due: row.total_due,
+      }).eq('id', row.id)
+      if (error) { res.status(500).json({ error: error.message }); return }
+    }
     await db.from('funding_commitments').update({
       actual_yield: (commitment.actual_yield ?? 0) + interestRecorded,
+      expected_yield: Math.max(0, (commitment.expected_yield ?? 0) + interestDelta + roll.newInterest),
       status: 'repaying',
     }).eq('id', commitment.id)
-    await db.from('loans').update({ status: 'repaying' }).eq('id', request.loan_id)
+    await db.from('loans').update({
+      status: 'repaying',
+      maturity_date: roll.maturity,
+      total_repayment: Math.max(0, (loan.total_repayment ?? 0) + interestDelta + roll.newInterest),
+    }).eq('id', request.loan_id)
   }
 
   await db.from('borrower_requests').update({
@@ -1212,12 +1233,12 @@ router.post('/borrower-requests/:id/decide', async (req: Request, res: Response)
   await createNotification({
     user_id: request.borrower_id,
     type: 'system',
-    title: request.kind === 'extension' ? 'Extension accepted' : request.kind === 'pay_in_full' ? 'Paid in full' : 'Interest payment recorded',
+    title: request.kind === 'extension' ? 'Extension accepted' : request.kind === 'pay_in_full' ? 'Paid in full' : 'Interest paid and due date moved',
     body: request.kind === 'extension'
       ? 'Your lender moved the due date. The extra interest is on the schedule.'
       : request.kind === 'pay_in_full'
         ? 'Your lender recorded the full payment calculated through today.'
-        : 'Your lender recorded the interest. The principal is still due.',
+        : 'Your lender recorded the interest and moved the principal due date.',
     link: `/borrower/loans/${request.loan_id}`,
   }).catch(() => undefined)
   res.json({ success: true, status: 'accepted' })

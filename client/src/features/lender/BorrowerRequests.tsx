@@ -66,7 +66,7 @@ export function BorrowerRequests({ loanId }: { loanId?: string }) {
                   ? `Extend the due date to ${row.requested_due_date ? formatDate(row.requested_due_date) : 'a later date'}. Extra interest ${formatCents(row.amount ?? 0, row.currency)}.`
                   : row.kind === 'pay_in_full'
                     ? `Record the full payment of ${formatCents(row.amount ?? 0, row.currency)} calculated through today. This closes the loan.`
-                    : `Record ${formatCents(row.amount ?? 0, row.currency)} of interest calculated through today. The principal stays on the schedule.`}
+                    : `Record ${formatCents(row.amount ?? 0, row.currency)} of interest through today and move the principal due to ${row.requested_due_date ? formatDate(row.requested_due_date) : 'a later date'}.`}
               </p>
             </div>
             <div className="flex gap-3">
